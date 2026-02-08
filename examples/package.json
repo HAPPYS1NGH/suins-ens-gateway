@@ -1,0 +1,12 @@
+{
+  "name": "suins-ens-examples",
+  "version": "1.0.0",
+  "description": "Examples for resolving SuiNS names via ENS",
+  "type": "module",
+  "scripts": {
+    "resolve": "node resolve-sui-address.js"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  }
+}
