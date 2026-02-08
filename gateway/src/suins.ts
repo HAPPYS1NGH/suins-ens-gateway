@@ -44,9 +44,23 @@ export async function resolveSuins(ensName: string): Promise<SuinsRecord | null>
       return null
     }
 
+    // Resolve avatar Sui object ID to its display image_url
+    let avatarUrl: string | null = null
+    if (nameRecord.avatar) {
+      try {
+        const obj = await suiClient.getObject({
+          id: nameRecord.avatar,
+          options: { showDisplay: true },
+        })
+        avatarUrl = obj.data?.display?.data?.image_url ?? null
+      } catch {
+        avatarUrl = null
+      }
+    }
+
     return {
       targetAddress: nameRecord.targetAddress ?? null,
-      avatar: nameRecord.avatar ?? null,
+      avatar: avatarUrl,
       contentHash: nameRecord.contentHash ?? null,
       walrusSiteId: nameRecord.walrusSiteId ?? null,
     }
