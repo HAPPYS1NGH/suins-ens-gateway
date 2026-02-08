@@ -2,7 +2,7 @@
 
 This project lets you resolve Sui Name Service (SuiNS) names through the Ethereum Name Service (ENS). If you own `happysingh.sui` on Sui, you can query it as `happysingh.onsui.eth` from any ENS client.
 
-**🌐 [Try the Demo](https://happysingh.sui.id)** | **📦 [GitHub](https://github.com/HAPPYS1NGH/suins-ens-gateway)**
+**🌐 Demo:** [happysingh.sui.id](https://happysingh.sui.id) • [happysingh.onsui.eth.limo](https://happysingh.onsui.eth.limo) | **📦 [GitHub](https://github.com/HAPPYS1NGH/suins-ens-gateway)**
 
 ## What this does
 
@@ -52,6 +52,17 @@ The gateway maps SuiNS fields to ENS standards:
 | `text("walrusSiteId")` | Walrus site ID |
 | `text("org.suins.name")` | Original .sui name |
 | `contenthash()` | ENSIP-7 encoded contenthash (0xe301 + CIDv1) |
+
+## Host websites on SuiNS + ENS
+
+Because we bridge `contenthash()`, you can host websites on IPFS and access them via both SuiNS and ENS gateways:
+
+1. Set your IPFS CID as `contentHash` on your SuiNS name (`happysingh.sui`)
+2. Access your site via:
+   - **SuiNS gateway:** https://happysingh.sui.id
+   - **ENS gateway:** https://happysingh.onsui.eth.limo
+
+Same content, two access points. The gateway converts SuiNS contentHash to ENSIP-7 format automatically.
 
 ## Project structure
 
