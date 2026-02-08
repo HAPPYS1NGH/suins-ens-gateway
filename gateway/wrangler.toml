@@ -1,0 +1,7 @@
+name = "suins-ens-gateway"
+main = "src/index.ts"
+compatibility_date = "2024-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Secrets (set via `wrangler secret put`):
+# - PRIVATE_KEY: hex private key for signing CCIP-Read responses

@@ -1,0 +1,21 @@
+{
+  "name": "suins-ens-contracts",
+  "version": "1.0.0",
+  "description": "OffchainResolver contract for SUINS-ENS gateway",
+  "license": "MIT",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "deploy": "npx hardhat run scripts/deploy.ts --network mainnet",
+    "deploy:sepolia": "npx hardhat run scripts/deploy.ts --network sepolia",
+    "set-resolver": "npx hardhat run scripts/set-resolver.ts --network mainnet",
+    "set-resolver:sepolia": "npx hardhat run scripts/set-resolver.ts --network sepolia"
+  },
+  "devDependencies": {
+    "@ensdomains/ens-contracts": "^0.0.22",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^4.9.6",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.22.0",
+    "viem": "^2.21.0"
+  }
+}

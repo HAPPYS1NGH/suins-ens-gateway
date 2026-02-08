@@ -1,0 +1,1 @@
+export { getCcipRead } from './getCcipRead'
