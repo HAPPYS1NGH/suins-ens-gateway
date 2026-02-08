@@ -2,6 +2,8 @@
 
 This project lets you resolve Sui Name Service (SuiNS) names through the Ethereum Name Service (ENS). If you own `happysingh.sui` on Sui, you can query it as `happysingh.onsui.eth` from any ENS client.
 
+**🌐 [Try the Demo](https://happysingh.sui.id)** | **📦 [GitHub](https://github.com/HAPPYS1NGH/suins-ens-gateway)**
+
 ## What this does
 
 ENS clients expect on-chain data. SuiNS names live on Sui. We bridge them using EIP-3668 (CCIP-Read), which lets Ethereum contracts fetch data from offchain sources.
