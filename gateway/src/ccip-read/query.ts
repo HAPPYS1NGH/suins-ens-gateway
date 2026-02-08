@@ -1,11 +1,50 @@
 import { zeroAddress } from 'viem'
 import { toHex } from 'viem/utils'
+import { CID } from 'multiformats/cid'
+import { base32 } from 'multiformats/bases/base32'
+import { base58btc } from 'multiformats/bases/base58'
 
 import { resolveSuins } from '../suins'
 import { ResolverQuery } from './utils'
 
 // SUI coin type per SLIP-44 / ENSIP-9
 const SUI_COIN_TYPE = BigInt(784)
+
+// ENSIP-7 ipfs-ns multicodec varint (0xe3 = 227, encoded as unsigned varint)
+const IPFS_NS = new Uint8Array([0xe3, 0x01])
+
+/**
+ * Encode a CID string into ENSIP-7 contenthash format.
+ * Format: <namespace-varint><cidv1-bytes>
+ *
+ * SUINS stores raw IPFS CID strings (CIDv0 "Qm..." or CIDv1 "bafy...").
+ * ENSIP-7 requires: <ipfs-ns varint 0xe301> + <CIDv1 bytes>.
+ * CIDv0 is converted to CIDv1 automatically.
+ */
+function encodeEnsContenthash(value: string): `0x${string}` {
+  let cid: CID
+
+  if (value.startsWith('Qm')) {
+    // CIDv0 (base58btc) → parse then convert to CIDv1
+    cid = CID.parse(value, base58btc).toV1()
+  } else if (value.startsWith('bafy') || value.startsWith('bafk') || value.startsWith('baf')) {
+    // CIDv1 base32lower
+    cid = CID.parse(value, base32)
+  } else {
+    // Try generic parse, convert to v1 if needed
+    cid = CID.parse(value)
+    if (cid.version === 0) {
+      cid = cid.toV1()
+    }
+  }
+
+  // ENSIP-7: ipfs-ns varint (0xe301) + CIDv1 raw bytes
+  const result = new Uint8Array(IPFS_NS.length + cid.bytes.length)
+  result.set(IPFS_NS)
+  result.set(cid.bytes, IPFS_NS.length)
+
+  return toHex(result)
+}
 
 /**
  * Resolve an ENS query by looking up the corresponding SUINS name.
@@ -68,13 +107,15 @@ export async function getRecord(
     }
 
     case 'contenthash': {
-      // Return contentHash as hex if available
+      // SUINS stores raw IPFS CID strings in content_hash.
+      // Encode as ENSIP-7: 0xe301 (ipfs-ns) + CIDv1 bytes
       if (nameData.contentHash) {
-        // If it's already hex, return as-is; otherwise encode as UTF-8 hex
-        if (nameData.contentHash.startsWith('0x')) {
-          return nameData.contentHash
+        try {
+          return encodeEnsContenthash(nameData.contentHash)
+        } catch {
+          // CID parsing failed — return empty
+          return '0x'
         }
-        return toHex(nameData.contentHash)
       }
       return '0x'
     }

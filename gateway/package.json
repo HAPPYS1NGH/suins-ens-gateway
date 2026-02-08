@@ -12,6 +12,7 @@
     "@mysten/sui": "^1.22.0",
     "@mysten/suins": "^0.5.0",
     "itty-router": "^5.0.17",
+    "multiformats": "^13.4.2",
     "viem": "^2.21.0",
     "zod": "^4.3.6"
   },

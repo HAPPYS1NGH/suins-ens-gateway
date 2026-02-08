@@ -5,7 +5,7 @@ async function main() {
   // ============================================================
   // UPDATE THIS after deploying the OffchainResolver contract
   // ============================================================
-  const RESOLVER_ADDRESS = "0x_PASTE_DEPLOYED_RESOLVER_ADDRESS_HERE";
+  const RESOLVER_ADDRESS = "0x47F3B5d858FeFE100016C75492a53a7296D1c335";
 
   const ENS_REGISTRY = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"; // Same on mainnet & sepolia
   const DOMAIN = "pushx.eth";
