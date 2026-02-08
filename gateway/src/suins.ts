@@ -9,11 +9,11 @@ const suinsClient = new SuinsClient({
 })
 
 // The parent ENS domain we serve subnames for
-const PARENT_DOMAIN = 'pushx.eth'
+const PARENT_DOMAIN = 'onsui.eth'
 
 /**
  * Extract the SUINS name from a full ENS name.
- * e.g. "happysingh.pushx.eth" → "happysingh.sui"
+ * e.g. "happysingh.onsui.eth" → "happysingh.sui"
  */
 function toSuiName(ensName: string): string {
   const suffix = `.${PARENT_DOMAIN}`
@@ -32,7 +32,7 @@ export interface SuinsRecord {
 }
 
 /**
- * Resolve a full ENS name (e.g. "happysingh.pushx.eth") via SUINS.
+ * Resolve a full ENS name (e.g. "happysingh.onsui.eth") via SUINS.
  */
 export async function resolveSuins(ensName: string): Promise<SuinsRecord | null> {
   const suiName = toSuiName(ensName)

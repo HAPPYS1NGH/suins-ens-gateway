@@ -21,7 +21,7 @@ const GATEWAY_URL = isProd
 const SENDER = '0x0000000000000000000000000000000000000001' as const
 
 const suiName = process.argv.filter(a => !a.startsWith('--'))[2] || 'suins'
-const TEST_NAME = `${suiName}.pushx.eth`
+const TEST_NAME = `${suiName}.onsui.eth`
 
 function dnsEncodeName(name: string): `0x${string}` {
   const labels = name.split('.')

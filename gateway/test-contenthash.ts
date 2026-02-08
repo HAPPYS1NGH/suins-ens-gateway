@@ -8,7 +8,7 @@ const GATEWAY = isProd
   : 'http://localhost:8787'
 const SENDER = '0x0000000000000000000000000000000000000001' as const
 const suiName = process.argv.filter(a => !a.startsWith('--'))[2] || 'happysingh'
-const name = `${suiName}.pushx.eth`
+const name = `${suiName}.onsui.eth`
 
 function dnsEncodeName(n: string): `0x${string}` {
   const labels = n.split('.')

@@ -17,10 +17,11 @@ interface IResolverService {
 }
 
 /**
- * Implements an ENS resolver that directs all queries to a CCIP read gateway.
+ * ENS resolver that bridges SUINS (Sui Name Service) names via CCIP-Read.
+ * Queries are directed to an offchain gateway that resolves names from SUINS.
  * Callers must implement EIP 3668 and ENSIP 10.
  */
-contract OffchainResolver is IExtendedResolver, ERC165, Ownable {
+contract SUINSResolver is IExtendedResolver, ERC165, Ownable {
     string public url;
     mapping(address => bool) public signers;
 
@@ -101,7 +102,7 @@ contract OffchainResolver is IExtendedResolver, ERC165, Ownable {
             address(this),
             urls,
             callData,
-            OffchainResolver.resolveWithProof.selector,
+            SUINSResolver.resolveWithProof.selector,
             abi.encode(callData, address(this))
         );
     }

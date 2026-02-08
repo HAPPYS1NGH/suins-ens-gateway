@@ -3,12 +3,12 @@ import { namehash } from "viem";
 
 async function main() {
   // ============================================================
-  // UPDATE THIS after deploying the OffchainResolver contract
+  // UPDATE THIS after deploying the SUINSResolver contract
   // ============================================================
-  const RESOLVER_ADDRESS = "0x47F3B5d858FeFE100016C75492a53a7296D1c335";
+  const RESOLVER_ADDRESS = "0x7974AF8BD3AEe4fe9f8833361fBc3249E3b23aB3";
 
   const ENS_REGISTRY = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"; // Same on mainnet & sepolia
-  const DOMAIN = "pushx.eth";
+  const DOMAIN = "onsui.eth";
   const node = namehash(DOMAIN);
 
   console.log(`Setting resolver for ${DOMAIN}...`);
@@ -28,7 +28,7 @@ async function main() {
   console.log(`  Tx hash:  ${tx.hash}`);
   await tx.wait();
 
-  console.log(`\nDone! ${DOMAIN} now resolves via the OffchainResolver.`);
+  console.log(`\nDone! ${DOMAIN} now resolves via the SUINSResolver.`);
   console.log(`Try: npx tsx ../gateway/test-decode.ts evan --prod`);
 }
 
