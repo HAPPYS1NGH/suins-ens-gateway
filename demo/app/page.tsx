@@ -1,3 +1,4 @@
+import { NameStatus } from "@/components/name-status";
 import { WalletAuth } from "@/components/wallet-auth";
 import { getCurrentSession } from "@/lib/auth/session";
 
@@ -39,6 +40,9 @@ export default async function Page() {
               : null
           }
         />
+
+        {/* Authenticated and authorized stay two visibly separate states. */}
+        {session ? <NameStatus /> : null}
       </main>
 
       <footer className="footer">

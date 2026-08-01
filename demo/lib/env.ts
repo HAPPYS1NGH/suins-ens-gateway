@@ -7,6 +7,8 @@ const envSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1),
   APP_ORIGIN: z.url(),
   SUI_NETWORK: z.enum(["mainnet", "testnet", "devnet", "localnet"]),
+  /** Overrides the public fullnode gRPC endpoint derived from SUI_NETWORK. */
+  SUI_RPC_URL: z.url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
