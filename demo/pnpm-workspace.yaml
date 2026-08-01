@@ -1,0 +1,7 @@
+# Install scripts are blocked globally by ~/.npmrc (ignore-scripts=true). Both of these
+# ship prebuilt platform binaries in optional deps, so skipping their postinstall is
+# safe: esbuild resolves @esbuild/<platform> at runtime, and sharp is only needed for
+# Next.js image optimization, which this demo does not use.
+allowBuilds:
+  esbuild: false
+  sharp: false
