@@ -286,6 +286,15 @@ body {
   font-size: 0.875rem;
 }
 
+.preview-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview-row:last-child {
+  border-bottom: none;
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -301,5 +310,42 @@ body {
 @media (max-width: 600px) {
   .main {
     padding: 24px 0;
+  }
+}
+
+/* Down to a 375px viewport: panels, inputs, and rows still stay full-width and
+   legible instead of overflowing or truncating. */
+@media (max-width: 400px) {
+  .app {
+    padding: 16px;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .input {
+    min-width: 0;
+  }
+
+  .btn,
+  .btn-secondary {
+    width: 100%;
+  }
+}
+
+/* No entrance/hover motion, and no future spinner keyframe, plays for users who
+   have asked the OS to reduce motion. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .btn:hover:not(:disabled) {
+    transform: none;
+    box-shadow: none;
   }
 }
