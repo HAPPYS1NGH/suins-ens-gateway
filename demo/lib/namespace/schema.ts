@@ -1,21 +1,70 @@
-import { isAddress } from "viem";
+import { ChainName, validateAddress } from "@thenamespace/offchain-manager";
 import { z } from "zod";
 
-export const ethereumAddressSchema = z
-  .string()
-  .refine((value) => isAddress(value, { strict: true }), {
-    message: "Must be a checksummed Ethereum address",
-  });
+const MAX_ADDRESS_RECORDS = 20;
+const MAX_TEXT_RECORDS = 30;
+const MAX_TEXT_VALUE_LENGTH = 512;
+const MAX_CONTENTHASH_LENGTH = 512;
+
+const SUPPORTED_CHAINS = new Set<string>(Object.values(ChainName));
 
 /**
- * Phase 3 covers a single field. Multichain addresses, arbitrary text records, and
- * contenthash join this schema in Phase 4 without changing the write path's shape.
+ * Keys the gateway always serves from SuiNS regardless of what Namespace holds
+ * (`gateway/src/ccip-read/precedence.ts`). Accepting them here would let a holder
+ * write a value the gateway would silently ignore, so the boundary rejects them
+ * outright instead of misleading the caller with an apparently successful save.
+ */
+const RESERVED_TEXT_KEYS = new Set(["org.suins.name", "walrus", "walrusSiteId"]);
+
+export const multichainAddressSchema = z
+  .object({
+    chain: z.string().refine((value) => SUPPORTED_CHAINS.has(value), {
+      message: "Unsupported chain",
+    }),
+    value: z.string().min(1).max(256),
+  })
+  .strict()
+  .superRefine((record, ctx) => {
+    try {
+      validateAddress(record.value, record.chain as ChainName);
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Invalid address for chain "${record.chain}"`,
+        path: ["value"],
+      });
+    }
+  });
+
+export const textRecordSchema = z
+  .object({
+    key: z
+      .string()
+      .min(1)
+      .max(256)
+      .refine((key) => !RESERVED_TEXT_KEYS.has(key), {
+        message: "This key is reserved for Sui-native data and cannot be set here",
+      }),
+    value: z.string().max(MAX_TEXT_VALUE_LENGTH),
+  })
+  .strict();
+
+export const contenthashSchema = z.string().min(1).max(MAX_CONTENTHASH_LENGTH);
+
+/**
+ * Every ENS record family the offchain-manager data model represents: multichain
+ * addresses, arbitrary text records, and contenthash. Reserved Sui-native keys are
+ * rejected at this boundary rather than accepted and silently ignored downstream.
  */
 export const ensRecordSchema = z
   .object({
     suiName: z.string().min(1).max(256),
-    ethereumAddress: ethereumAddressSchema.optional(),
+    addresses: z.array(multichainAddressSchema).max(MAX_ADDRESS_RECORDS).default([]),
+    texts: z.array(textRecordSchema).max(MAX_TEXT_RECORDS).default([]),
+    contenthash: contenthashSchema.optional(),
   })
   .strict();
 
+export type MultichainAddressInput = z.infer<typeof multichainAddressSchema>;
+export type TextRecordInput = z.infer<typeof textRecordSchema>;
 export type EnsRecordInput = z.infer<typeof ensRecordSchema>;

@@ -1,9 +1,8 @@
 import "server-only";
 
 import {
-  ChainName,
-  getCoinType,
   SubnameAlreadyExistsError,
+  type ChainName,
   type OffchainClient,
   type SubnameDTO,
 } from "@thenamespace/offchain-manager";
@@ -11,6 +10,7 @@ import { isAxiosError } from "axios";
 import { getAddress } from "viem";
 
 import { env } from "@/lib/env";
+import type { MultichainAddressInput, TextRecordInput } from "@/lib/namespace/schema";
 import { checkNameOwnership, type NameOwnershipStatus } from "@/lib/suins/ownership";
 
 import { namespaceClient } from "./client";
@@ -18,18 +18,21 @@ import { namespaceClient } from "./client";
 const PARENT_DOMAIN = "onsui.eth";
 const NAMESPACE_APP_ID = "sui-name-holder-demo";
 const NAMESPACE_SCHEMA_VERSION = "1";
-const ETH_COIN_TYPE_KEY = String(getCoinType(ChainName.Ethereum));
 
 export interface UpsertInput {
   /** Name as entered by the user; re-verified against `suiAddress` before any write. */
   suiName: string;
   suiAddress: string;
-  ethereumAddress?: string;
+  addresses?: MultichainAddressInput[];
+  texts?: TextRecordInput[];
+  contenthash?: string;
 }
 
 export interface PublicProfile {
   fullName: string;
-  ethereumAddress: string | null;
+  addresses: Record<string, string>;
+  texts: Record<string, string>;
+  contenthash: string | null;
 }
 
 /** The wallet does not currently, directly, own this name's registration NFT. */
@@ -92,10 +95,22 @@ function matchesProvenance(dto: SubnameDTO, provenance: Provenance): boolean {
   );
 }
 
-function toAddressRecords(ethereumAddress: string | undefined) {
-  return ethereumAddress
-    ? [{ chain: ChainName.Ethereum, value: getAddress(ethereumAddress) }]
-    : [];
+/**
+ * Checksums Ethereum-format addresses; every other chain's address format is
+ * preserved exactly as the (already-validated) caller supplied it.
+ */
+function toAddressRecords(addresses: MultichainAddressInput[] | undefined) {
+  return (addresses ?? []).map(({ chain, value }) => {
+    try {
+      return { chain: chain as ChainName, value: getAddress(value) };
+    } catch {
+      return { chain: chain as ChainName, value };
+    }
+  });
+}
+
+function toTextRecords(texts: TextRecordInput[] | undefined) {
+  return (texts ?? []).map(({ key, value }) => ({ key, value }));
 }
 
 /**
@@ -123,6 +138,10 @@ async function getSubnameOrNull(
  * requires every immutable provenance field to match before updating, so an update
  * can never silently take over a label this app did not create for this exact
  * registration. The Namespace `owner` field is intentionally never set.
+ *
+ * Every write is a complete desired-state write: `addresses`/`texts`/`contenthash`
+ * replace whatever Namespace currently holds for this label, they are never merged
+ * field-by-field, so a removed row in the editor is actually removed here too.
  */
 export async function upsertSubname(input: UpsertInput): Promise<void> {
   const ownership = await checkNameOwnership(input.suiName, input.suiAddress);
@@ -132,7 +151,9 @@ export async function upsertSubname(input: UpsertInput): Promise<void> {
 
   const { label, fullName } = toEnsIdentity(ownership.normalizedName);
   const provenance = buildProvenance(ownership.normalizedName, ownership.nftId);
-  const addresses = toAddressRecords(input.ethereumAddress);
+  const addresses = toAddressRecords(input.addresses);
+  const texts = toTextRecords(input.texts);
+  const contenthash = input.contenthash;
   const client = namespaceClient();
 
   let current = await getSubnameOrNull(client, fullName);
@@ -143,6 +164,8 @@ export async function upsertSubname(input: UpsertInput): Promise<void> {
         parentName: PARENT_DOMAIN,
         label,
         addresses,
+        texts,
+        contenthash,
         metadata: toMetadataRecords(provenance),
       });
       return;
@@ -159,7 +182,15 @@ export async function upsertSubname(input: UpsertInput): Promise<void> {
     throw new NamespaceLabelCollisionError(fullName);
   }
 
-  await client.updateSubname(fullName, { addresses });
+  // `updateSubname`'s `metadata` field replaces whatever is stored, it is never
+  // merged — omitting it risks the API clearing provenance on the next update, which
+  // would then permanently fail every future write for this label as a collision.
+  await client.updateSubname(fullName, {
+    addresses,
+    texts,
+    contenthash,
+    metadata: toMetadataRecords(provenance),
+  });
 }
 
 /** Public read projection. Never returns the full `SubnameDTO`. */
@@ -169,6 +200,8 @@ export async function readProfile(fullName: string): Promise<PublicProfile | nul
 
   return {
     fullName: dto.fullName,
-    ethereumAddress: dto.addresses[ETH_COIN_TYPE_KEY] ?? null,
+    addresses: dto.addresses,
+    texts: dto.texts,
+    contenthash: dto.contenthash ?? null,
   };
 }

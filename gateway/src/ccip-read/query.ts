@@ -1,15 +1,18 @@
+import { getCoderByCoinType } from '@ensdomains/address-encoder'
 import { zeroAddress } from 'viem'
 import { toHex } from 'viem/utils'
 import { CID } from 'multiformats/cid'
 import { base32 } from 'multiformats/bases/base32'
 import { base58btc } from 'multiformats/bases/base58'
 
-import { ETH_COIN_TYPE_KEY, resolveNamespace } from '../namespace'
+import { resolveNamespace } from '../namespace'
 import { resolveSuins } from '../suins'
+import { selectRecordValue } from './precedence'
 import { ResolverQuery } from './utils'
 
 // SUI coin type per SLIP-44 / ENSIP-9
 const SUI_COIN_TYPE = BigInt(784)
+const ETH_COIN_TYPE = BigInt(60)
 
 // Sui addresses are 32 bytes; viem's zeroAddress is a 20-byte EVM address and
 // would decode wrong for coin 784.
@@ -22,9 +25,9 @@ const IPFS_NS = new Uint8Array([0xe3, 0x01])
  * Encode a CID string into ENSIP-7 contenthash format.
  * Format: <namespace-varint><cidv1-bytes>
  *
- * SUINS stores raw IPFS CID strings (CIDv0 "Qm..." or CIDv1 "bafy...").
- * ENSIP-7 requires: <ipfs-ns varint 0xe301> + <CIDv1 bytes>.
- * CIDv0 is converted to CIDv1 automatically.
+ * SUINS (and Namespace, using the same convention) store raw IPFS CID strings
+ * (CIDv0 "Qm..." or CIDv1 "bafy..."). ENSIP-7 requires:
+ * <ipfs-ns varint 0xe301> + <CIDv1 bytes>. CIDv0 is converted to CIDv1 automatically.
  */
 function encodeEnsContenthash(value: string): `0x${string}` {
   let cid: CID
@@ -52,14 +55,36 @@ function encodeEnsContenthash(value: string): `0x${string}` {
 }
 
 /**
- * Resolve an ENS query by looking up the corresponding SUINS name and, for the
- * `addr` branch, the public Namespace record.
+ * Encode a display-form address into ENSIP-9 `addr(node, coinType)` bytes.
+ *
+ * `addr(node)` (Ethereum, no coinType argument) and `addr(node, 60)` both return
+ * Solidity `address`/20-byte EVM bytes, so an empty value there is conventionally
+ * the 20-byte zero address. Every other coin type returns native chain bytes, whose
+ * length is coin-specific — an empty or unsupported/malformed value there must be
+ * zero-length `0x`, never a 20- or 32-byte zero borrowed from a different chain.
+ */
+function encodeEnsipNineAddress(value: string, coinType: bigint): string {
+  const isEthCall = coinType === ETH_COIN_TYPE
+  if (!value) return isEthCall ? zeroAddress : '0x'
+
+  try {
+    return toHex(getCoderByCoinType(Number(coinType)).decode(value))
+  } catch {
+    return isEthCall ? zeroAddress : '0x'
+  }
+}
+
+/**
+ * Resolve an ENS query by looking up the corresponding SUINS name and the public
+ * Namespace record, then selecting one value per the fixed precedence policy.
  *
  * Supported queries:
  * - addr(784)  → SUI target address from SUINS
- * - addr(60) / addr(node) → Ethereum address from Namespace
- * - text(key)  → avatar, contentHash, walrusSiteId from SUINS data
- * - contenthash → SUINS contentHash if available
+ * - addr(60) / addr(node) / other coin types → address from Namespace, ENSIP-9 encoded
+ * - text(key)  → SuiNS-authoritative keys (avatar/contentHash/walrus/org.suins.name)
+ *   fall back to or are overridden only per the precedence policy; every other key
+ *   comes from Namespace
+ * - contenthash → SUINS contentHash, falling back to Namespace's
  */
 export async function getRecord(
   name: string,
@@ -75,19 +100,15 @@ export async function getRecord(
   ])
 
   if (functionName === 'addr') {
-    const coinType = args[1] ?? BigInt(60)
+    const coinType = args[1] ?? ETH_COIN_TYPE
+    const value = selectRecordValue(query, nameData, namespaceData)
 
     if (coinType === SUI_COIN_TYPE) {
       // The canonical Sui address cannot be changed through Namespace.
-      return nameData?.targetAddress ?? SUI_ZERO_ADDRESS
+      return value || SUI_ZERO_ADDRESS
     }
 
-    if (String(coinType) === ETH_COIN_TYPE_KEY) {
-      return namespaceData?.addresses[ETH_COIN_TYPE_KEY] ?? zeroAddress
-    }
-
-    // Other coin types join in a later phase.
-    return zeroAddress
+    return encodeEnsipNineAddress(value, coinType)
   }
 
   if (!nameData) {
@@ -100,33 +121,25 @@ export async function getRecord(
     case 'text': {
       const key = args[1]
 
-      switch (key) {
-        case 'avatar':
-          return nameData.avatar ?? ''
-        case 'contentHash':
-          return nameData.contentHash ?? ''
-        case 'walrusSiteId':
-          return nameData.walrusSiteId ?? ''
-        case 'org.suins.name':
-          // Convenience: return the original SUI name
-          return name.split('.')[0] + '.sui'
-        default:
-          return ''
+      if (key === 'org.suins.name') {
+        // Convenience: return the original SUI name. Derived from the requested
+        // name itself, not from either record source.
+        return name.split('.')[0] + '.sui'
       }
+
+      return selectRecordValue(query, nameData, namespaceData)
     }
 
     case 'contenthash': {
-      // SUINS stores raw IPFS CID strings in content_hash.
-      // Encode as ENSIP-7: 0xe301 (ipfs-ns) + CIDv1 bytes
-      if (nameData.contentHash) {
-        try {
-          return encodeEnsContenthash(nameData.contentHash)
-        } catch {
-          // CID parsing failed — return empty
-          return '0x'
-        }
+      const value = selectRecordValue(query, nameData, namespaceData)
+      if (!value) return '0x'
+
+      try {
+        return encodeEnsContenthash(value)
+      } catch {
+        // CID parsing failed — return empty
+        return '0x'
       }
-      return '0x'
     }
 
     default:

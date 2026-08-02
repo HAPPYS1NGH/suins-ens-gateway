@@ -76,7 +76,9 @@ export async function POST(request: Request): Promise<Response> {
       await upsertSubname({
         suiName: body.data.suiName,
         suiAddress: session.suiAddress,
-        ethereumAddress: body.data.ethereumAddress,
+        addresses: body.data.addresses,
+        texts: body.data.texts,
+        contenthash: body.data.contenthash,
       });
     } catch (error) {
       if (error instanceof NameNotOwnedError) {

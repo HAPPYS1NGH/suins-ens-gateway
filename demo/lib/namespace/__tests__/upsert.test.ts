@@ -27,6 +27,8 @@ const { upsertSubname, NameNotOwnedError, NamespaceLabelCollisionError } = await
 const HOLDER = "0x0000000000000000000000000000000000000000000000000000000000000001";
 const NFT_ID = "0xabc";
 const ETH_ADDRESS = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
+const ETH_ADDRESS_LOWERCASE = ETH_ADDRESS.toLowerCase();
+const SOL_ADDRESS = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
 
 const owned = (overrides: Record<string, unknown> = {}) => ({
   status: "owned",
@@ -60,7 +62,7 @@ describe("upsertSubname", () => {
     await upsertSubname({
       suiName: "happy.sui",
       suiAddress: HOLDER,
-      ethereumAddress: ETH_ADDRESS,
+      addresses: [{ chain: "eth", value: ETH_ADDRESS }],
     });
 
     expect(createSubname).toHaveBeenCalledWith(
@@ -96,7 +98,7 @@ describe("upsertSubname", () => {
     await upsertSubname({
       suiName: "happy.sui",
       suiAddress: HOLDER,
-      ethereumAddress: ETH_ADDRESS,
+      addresses: [{ chain: "eth", value: ETH_ADDRESS }],
     });
 
     expect(createSubname).toHaveBeenCalled();
@@ -116,13 +118,70 @@ describe("upsertSubname", () => {
     await upsertSubname({
       suiName: "happy.sui",
       suiAddress: HOLDER,
-      ethereumAddress: ETH_ADDRESS,
+      addresses: [{ chain: "eth", value: ETH_ADDRESS }],
     });
 
     expect(createSubname).not.toHaveBeenCalled();
     expect(updateSubname).toHaveBeenCalledWith("happy.onsui.eth", {
       addresses: [{ chain: "eth", value: ETH_ADDRESS }],
+      texts: [],
+      contenthash: undefined,
+      metadata: expect.arrayContaining([
+        { key: "app", value: "sui-name-holder-demo" },
+        { key: "suinsNftId", value: NFT_ID },
+      ]),
     });
+  });
+
+  it("maps text records and contenthash into a complete desired-state write", async () => {
+    checkNameOwnership.mockResolvedValue(owned());
+    getSingleSubname.mockResolvedValue({
+      fullName: "happy.onsui.eth",
+      metadata: provenanceMetadata(),
+      addresses: {},
+      texts: {},
+    });
+    updateSubname.mockResolvedValue(undefined);
+
+    await upsertSubname({
+      suiName: "happy.sui",
+      suiAddress: HOLDER,
+      addresses: [
+        { chain: "eth", value: ETH_ADDRESS },
+        { chain: "sol", value: SOL_ADDRESS },
+      ],
+      texts: [{ key: "com.twitter", value: "happysingh" }],
+      contenthash: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+    });
+
+    expect(updateSubname).toHaveBeenCalledWith("happy.onsui.eth", {
+      addresses: [
+        { chain: "eth", value: ETH_ADDRESS },
+        { chain: "sol", value: SOL_ADDRESS },
+      ],
+      texts: [{ key: "com.twitter", value: "happysingh" }],
+      contenthash: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+      metadata: expect.arrayContaining([
+        { key: "app", value: "sui-name-holder-demo" },
+        { key: "suinsNftId", value: NFT_ID },
+      ]),
+    });
+  });
+
+  it("checksums an Ethereum address that was not already checksummed", async () => {
+    checkNameOwnership.mockResolvedValue(owned());
+    getSingleSubname.mockResolvedValue(null);
+    createSubname.mockResolvedValue(undefined);
+
+    await upsertSubname({
+      suiName: "happy.sui",
+      suiAddress: HOLDER,
+      addresses: [{ chain: "eth", value: ETH_ADDRESS_LOWERCASE }],
+    });
+
+    expect(createSubname).toHaveBeenCalledWith(
+      expect.objectContaining({ addresses: [{ chain: "eth", value: ETH_ADDRESS }] }),
+    );
   });
 
   it("fails closed as a collision when provenance does not match", async () => {
@@ -157,12 +216,18 @@ describe("upsertSubname", () => {
     await upsertSubname({
       suiName: "happy.sui",
       suiAddress: HOLDER,
-      ethereumAddress: ETH_ADDRESS,
+      addresses: [{ chain: "eth", value: ETH_ADDRESS }],
     });
 
     expect(getSingleSubname).toHaveBeenCalledTimes(2);
     expect(updateSubname).toHaveBeenCalledWith("happy.onsui.eth", {
       addresses: [{ chain: "eth", value: ETH_ADDRESS }],
+      texts: [],
+      contenthash: undefined,
+      metadata: expect.arrayContaining([
+        { key: "app", value: "sui-name-holder-demo" },
+        { key: "suinsNftId", value: NFT_ID },
+      ]),
     });
   });
 
