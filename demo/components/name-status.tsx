@@ -41,7 +41,16 @@ const COPY: Record<NameOwnershipStatus, { tone: "ok" | "warn" | "bad"; text: str
   "invalid-name": { tone: "warn", text: "That is not a valid SuiNS name." },
 };
 
-export function NameStatus() {
+interface NameStatusProps {
+  /**
+   * Called with the normalized name whenever the check comes back `"owned"`, and
+   * with `null` otherwise. The record editor only ever writes the name this app
+   * just confirmed ownership of — never a second, independently typed one.
+   */
+  onVerified?: (normalizedName: string | null) => void;
+}
+
+export function NameStatus({ onVerified }: NameStatusProps = {}) {
   const [name, setName] = useState("");
   const [result, setResult] = useState<CheckResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +61,7 @@ export function NameStatus() {
     setBusy(true);
     setError(null);
     setResult(null);
+    onVerified?.(null);
     try {
       const response = await fetch("/api/names/check", {
         method: "POST",
@@ -62,7 +72,11 @@ export function NameStatus() {
       if (!response.ok) {
         throw new Error(data.error ?? `Request failed with ${response.status}`);
       }
-      setResult(data as CheckResult);
+      const checked = data as CheckResult;
+      setResult(checked);
+      onVerified?.(
+        checked.status === "owned" ? checked.normalizedName : null,
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Check failed");
     } finally {
