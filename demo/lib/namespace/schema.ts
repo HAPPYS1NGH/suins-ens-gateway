@@ -62,6 +62,15 @@ export const ensRecordSchema = z
     addresses: z.array(multichainAddressSchema).max(MAX_ADDRESS_RECORDS).default([]),
     texts: z.array(textRecordSchema).max(MAX_TEXT_RECORDS).default([]),
     contenthash: contenthashSchema.optional(),
+    removeAddresses: z
+      .array(
+        z.string().refine((value) => SUPPORTED_CHAINS.has(value), {
+          message: "Unsupported chain",
+        }),
+      )
+      .max(MAX_ADDRESS_RECORDS)
+      .default([]),
+    removeTextKeys: z.array(z.string().min(1).max(256)).max(MAX_TEXT_RECORDS).default([]),
   })
   .strict();
 

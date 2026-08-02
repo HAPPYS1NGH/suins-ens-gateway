@@ -168,6 +168,90 @@ describe("upsertSubname", () => {
     });
   });
 
+  it("merges a new address into existing records instead of replacing them", async () => {
+    checkNameOwnership.mockResolvedValue(owned());
+    getSingleSubname.mockResolvedValue({
+      fullName: "happy.onsui.eth",
+      metadata: provenanceMetadata(),
+      addresses: { sol: SOL_ADDRESS },
+      texts: { "com.twitter": "happysingh" },
+    });
+    updateSubname.mockResolvedValue(undefined);
+
+    await upsertSubname({
+      suiName: "happy.sui",
+      suiAddress: HOLDER,
+      addresses: [{ chain: "eth", value: ETH_ADDRESS }],
+    });
+
+    expect(updateSubname).toHaveBeenCalledWith("happy.onsui.eth", {
+      addresses: [
+        { chain: "sol", value: SOL_ADDRESS },
+        { chain: "eth", value: ETH_ADDRESS },
+      ],
+      texts: [{ key: "com.twitter", value: "happysingh" }],
+      contenthash: undefined,
+      metadata: expect.arrayContaining([
+        { key: "app", value: "sui-name-holder-demo" },
+        { key: "suinsNftId", value: NFT_ID },
+      ]),
+    });
+  });
+
+  it("removes only the address chains listed in removeAddresses", async () => {
+    checkNameOwnership.mockResolvedValue(owned());
+    getSingleSubname.mockResolvedValue({
+      fullName: "happy.onsui.eth",
+      metadata: provenanceMetadata(),
+      addresses: { eth: ETH_ADDRESS, sol: SOL_ADDRESS },
+      texts: {},
+    });
+    updateSubname.mockResolvedValue(undefined);
+
+    await upsertSubname({
+      suiName: "happy.sui",
+      suiAddress: HOLDER,
+      removeAddresses: ["sol"],
+    });
+
+    expect(updateSubname).toHaveBeenCalledWith("happy.onsui.eth", {
+      addresses: [{ chain: "eth", value: ETH_ADDRESS }],
+      texts: [],
+      contenthash: undefined,
+      metadata: expect.arrayContaining([
+        { key: "app", value: "sui-name-holder-demo" },
+        { key: "suinsNftId", value: NFT_ID },
+      ]),
+    });
+  });
+
+  it("removes only the text keys listed in removeTextKeys", async () => {
+    checkNameOwnership.mockResolvedValue(owned());
+    getSingleSubname.mockResolvedValue({
+      fullName: "happy.onsui.eth",
+      metadata: provenanceMetadata(),
+      addresses: {},
+      texts: { "com.twitter": "happysingh", "com.github": "happy" },
+    });
+    updateSubname.mockResolvedValue(undefined);
+
+    await upsertSubname({
+      suiName: "happy.sui",
+      suiAddress: HOLDER,
+      removeTextKeys: ["com.github"],
+    });
+
+    expect(updateSubname).toHaveBeenCalledWith("happy.onsui.eth", {
+      addresses: [],
+      texts: [{ key: "com.twitter", value: "happysingh" }],
+      contenthash: undefined,
+      metadata: expect.arrayContaining([
+        { key: "app", value: "sui-name-holder-demo" },
+        { key: "suinsNftId", value: NFT_ID },
+      ]),
+    });
+  });
+
   it("checksums an Ethereum address that was not already checksummed", async () => {
     checkNameOwnership.mockResolvedValue(owned());
     getSingleSubname.mockResolvedValue(null);

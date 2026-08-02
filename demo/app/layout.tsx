@@ -28,9 +28,7 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <div className="noise" aria-hidden="true" />
-        <div className="glow glow-1" aria-hidden="true" />
-        <div className="glow glow-2" aria-hidden="true" />
+        <div className="glow" aria-hidden="true" />
         {children}
       </body>
     </html>

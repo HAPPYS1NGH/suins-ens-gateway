@@ -85,4 +85,37 @@ describe("ensRecordSchema", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("accepts removeAddresses and removeTextKeys", () => {
+    const result = ensRecordSchema.safeParse({
+      suiName: "happy.sui",
+      removeAddresses: ["eth"],
+      removeTextKeys: ["com.twitter"],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.removeAddresses).toEqual(["eth"]);
+      expect(result.data.removeTextKeys).toEqual(["com.twitter"]);
+    }
+  });
+
+  it("defaults removeAddresses and removeTextKeys to empty arrays when omitted", () => {
+    const result = ensRecordSchema.safeParse({ suiName: "happy.sui" });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.removeAddresses).toEqual([]);
+      expect(result.data.removeTextKeys).toEqual([]);
+    }
+  });
+
+  it("rejects an unsupported chain in removeAddresses", () => {
+    const result = ensRecordSchema.safeParse({
+      suiName: "happy.sui",
+      removeAddresses: ["not-a-real-chain"],
+    });
+
+    expect(result.success).toBe(false);
+  });
 });

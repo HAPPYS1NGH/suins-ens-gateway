@@ -80,7 +80,6 @@ export function ResolutionPreview({ suiName }: ResolutionPreviewProps) {
   }, [load]);
 
   const savedEthAddress = data?.profile?.addresses[ETH_COIN_TYPE] ?? null;
-  const savedContenthash = data?.profile?.contenthash ?? null;
   const textKeys = data?.profile ? Object.keys(data.profile.texts) : [];
 
   return (
@@ -126,11 +125,6 @@ export function ResolutionPreview({ suiName }: ResolutionPreviewProps) {
                 resolved={resolvedCopy(data.preview.texts[key])}
               />
             ))}
-            <PreviewRow
-              label="Contenthash"
-              saved={savedContenthash ?? "not set"}
-              resolved={resolvedCopy(data.preview.contenthash)}
-            />
           </>
         ) : (
           <p className="mono muted">{busy ? "Resolving…" : "No preview yet."}</p>

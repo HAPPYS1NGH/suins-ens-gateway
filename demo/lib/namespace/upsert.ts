@@ -26,6 +26,8 @@ export interface UpsertInput {
   addresses?: MultichainAddressInput[];
   texts?: TextRecordInput[];
   contenthash?: string;
+  removeAddresses?: string[];
+  removeTextKeys?: string[];
 }
 
 export interface PublicProfile {
@@ -114,6 +116,34 @@ function toTextRecords(texts: TextRecordInput[] | undefined) {
 }
 
 /**
+ * Applies validated upserts on top of what Namespace currently holds, then deletes
+ * anything explicitly removed. Never treats "not in this payload" as "delete" —
+ * only an entry in `removals` deletes a key, so a save that only touches one field
+ * can never silently wipe every other saved record.
+ */
+function mergeAddressRecords(
+  current: Record<string, string>,
+  upserts: { chain: ChainName; value: string }[],
+  removals: string[],
+): { chain: ChainName; value: string }[] {
+  const merged: Record<string, string> = { ...current };
+  for (const { chain, value } of upserts) merged[chain] = value;
+  for (const chain of removals) delete merged[chain];
+  return Object.entries(merged).map(([chain, value]) => ({ chain: chain as ChainName, value }));
+}
+
+function mergeTextRecords(
+  current: Record<string, string>,
+  upserts: { key: string; value: string }[],
+  removals: string[],
+): { key: string; value: string }[] {
+  const merged: Record<string, string> = { ...current };
+  for (const { key, value } of upserts) merged[key] = value;
+  for (const key of removals) delete merged[key];
+  return Object.entries(merged).map(([key, value]) => ({ key, value }));
+}
+
+/**
  * The SDK's own `getSingleSubname` is supposed to translate a 404 into `null`, but
  * its internal `err instanceof AxiosError` check is unreliable across Next.js's
  * bundled module graph — a raw AxiosError can still escape. `isAxiosError` is a
@@ -139,9 +169,11 @@ async function getSubnameOrNull(
  * can never silently take over a label this app did not create for this exact
  * registration. The Namespace `owner` field is intentionally never set.
  *
- * Every write is a complete desired-state write: `addresses`/`texts`/`contenthash`
- * replace whatever Namespace currently holds for this label, they are never merged
- * field-by-field, so a removed row in the editor is actually removed here too.
+ * Addresses and text records are merge-patched, not replaced: each submitted entry
+ * upserts by its key (chain or text key) on top of whatever Namespace already
+ * holds, and only a key explicitly listed in `removeAddresses` / `removeTextKeys`
+ * is deleted. A save that only touches one field can never silently drop every
+ * other previously saved record.
  */
 export async function upsertSubname(input: UpsertInput): Promise<void> {
   const ownership = await checkNameOwnership(input.suiName, input.suiAddress);
@@ -151,8 +183,10 @@ export async function upsertSubname(input: UpsertInput): Promise<void> {
 
   const { label, fullName } = toEnsIdentity(ownership.normalizedName);
   const provenance = buildProvenance(ownership.normalizedName, ownership.nftId);
-  const addresses = toAddressRecords(input.addresses);
-  const texts = toTextRecords(input.texts);
+  const addressUpserts = toAddressRecords(input.addresses);
+  const textUpserts = toTextRecords(input.texts);
+  const removeAddresses = input.removeAddresses ?? [];
+  const removeTextKeys = input.removeTextKeys ?? [];
   const contenthash = input.contenthash;
   const client = namespaceClient();
 
@@ -163,8 +197,8 @@ export async function upsertSubname(input: UpsertInput): Promise<void> {
       await client.createSubname({
         parentName: PARENT_DOMAIN,
         label,
-        addresses,
-        texts,
+        addresses: mergeAddressRecords({}, addressUpserts, removeAddresses),
+        texts: mergeTextRecords({}, textUpserts, removeTextKeys),
         contenthash,
         metadata: toMetadataRecords(provenance),
       });
@@ -182,12 +216,12 @@ export async function upsertSubname(input: UpsertInput): Promise<void> {
     throw new NamespaceLabelCollisionError(fullName);
   }
 
-  // `updateSubname`'s `metadata` field replaces whatever is stored, it is never
-  // merged — omitting it risks the API clearing provenance on the next update, which
-  // would then permanently fail every future write for this label as a collision.
+  // `updateSubname`'s `addresses`/`texts`/`metadata` fields each replace their whole
+  // collection when provided, so the full merged desired state is computed here
+  // before the call — the SDK itself does not merge field-by-field.
   await client.updateSubname(fullName, {
-    addresses,
-    texts,
+    addresses: mergeAddressRecords(current.addresses, addressUpserts, removeAddresses),
+    texts: mergeTextRecords(current.texts, textUpserts, removeTextKeys),
     contenthash,
     metadata: toMetadataRecords(provenance),
   });

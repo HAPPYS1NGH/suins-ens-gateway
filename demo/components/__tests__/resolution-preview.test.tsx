@@ -42,5 +42,6 @@ describe("ResolutionPreview", () => {
     const liveRegion = savedEth.closest('[aria-live="polite"]');
     expect(liveRegion).toBeTruthy();
     expect(screen.getAllByText(/resolved: not resolvable yet/).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Contenthash")).toBeNull();
   });
 });

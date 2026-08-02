@@ -79,6 +79,8 @@ export async function POST(request: Request): Promise<Response> {
         addresses: body.data.addresses,
         texts: body.data.texts,
         contenthash: body.data.contenthash,
+        removeAddresses: body.data.removeAddresses,
+        removeTextKeys: body.data.removeTextKeys,
       });
     } catch (error) {
       if (error instanceof NameNotOwnedError) {
