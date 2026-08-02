@@ -8,6 +8,48 @@ export const ETH_COIN_TYPE_KEY = String(getCoinType(ChainName.Ethereum))
 
 const CACHE_TTL_SECONDS = 60
 
+// Namespace stores these EVM L2 addresses keyed by the chain's raw EVM chainId
+// (e.g. Base -> "8453"). ENSIP-11 — and `@ensdomains/address-encoder`, which the
+// gateway uses to encode `addr(node, coinType)` — requires `0x80000000 | chainId`
+// instead. `eth` (SLIP-44 60) and `default` (already `0x80000000`) need no remap.
+const ENSIP11_EVM_CHAINS = [
+  ChainName.Optimism,
+  ChainName.Arbitrum,
+  ChainName.Base,
+  ChainName.Polygon,
+  ChainName.Bsc,
+  ChainName.Avalanche,
+  ChainName.Gnosis,
+  ChainName.Zksync,
+  ChainName.Linea,
+  ChainName.Scroll,
+  ChainName.Unichain,
+  ChainName.Berachain,
+  ChainName.WorldChain,
+  ChainName.Zora,
+  ChainName.Celo,
+  ChainName.Monad,
+  ChainName.Push,
+]
+
+const ENSIP11_OFFSET = 0x80000000
+
+/** Namespace's raw storage key -> the ENSIP coinType resolver queries actually use. */
+const NAMESPACE_KEY_TO_COIN_TYPE: Record<string, string> = Object.fromEntries(
+  ENSIP11_EVM_CHAINS.map((chain) => {
+    const rawCoin = getCoinType(chain)
+    return [String(rawCoin), String(ENSIP11_OFFSET + rawCoin)]
+  })
+)
+
+function remapAddressKeys(addresses: Record<string, string>): Record<string, string> {
+  const remapped: Record<string, string> = {}
+  for (const [key, value] of Object.entries(addresses)) {
+    remapped[NAMESPACE_KEY_TO_COIN_TYPE[key] ?? key] = value
+  }
+  return remapped
+}
+
 export interface NamespaceRecord {
   addresses: Record<string, string>
   texts: Record<string, string>
@@ -38,7 +80,11 @@ export async function resolveNamespace(ensName: string): Promise<NamespaceRecord
   try {
     const dto = await client.getSingleSubname(ensName)
     const record: NamespaceRecord | null = dto
-      ? { addresses: dto.addresses, texts: dto.texts, contenthash: dto.contenthash ?? null }
+      ? {
+          addresses: remapAddressKeys(dto.addresses),
+          texts: dto.texts,
+          contenthash: dto.contenthash ?? null,
+        }
       : null
 
     const response = record
