@@ -87,6 +87,16 @@ describe('getRecord addr', () => {
 
     expect(result).toBe(zeroAddress)
   })
+
+  it('returns a 32-byte zero for coin type 784 with no targetAddress, not the 20-byte EVM zero address', async () => {
+    resolveSuins.mockResolvedValue(suinsRecord({ targetAddress: null }))
+    resolveNamespace.mockResolvedValue(null)
+
+    const result = await getRecord(NAME, { functionName: 'addr', args: [NODE, 784n] })
+
+    expect(result).toBe(`0x${'00'.repeat(32)}`)
+    expect(result).not.toBe(zeroAddress)
+  })
 })
 
 describe('getRecord text/contenthash', () => {

@@ -11,6 +11,10 @@ import { ResolverQuery } from './utils'
 // SUI coin type per SLIP-44 / ENSIP-9
 const SUI_COIN_TYPE = BigInt(784)
 
+// Sui addresses are 32 bytes; viem's zeroAddress is a 20-byte EVM address and
+// would decode wrong for coin 784.
+const SUI_ZERO_ADDRESS = `0x${'00'.repeat(32)}` as const
+
 // ENSIP-7 ipfs-ns multicodec varint (0xe3 = 227, encoded as unsigned varint)
 const IPFS_NS = new Uint8Array([0xe3, 0x01])
 
@@ -75,7 +79,7 @@ export async function getRecord(
 
     if (coinType === SUI_COIN_TYPE) {
       // The canonical Sui address cannot be changed through Namespace.
-      return nameData?.targetAddress ?? zeroAddress
+      return nameData?.targetAddress ?? SUI_ZERO_ADDRESS
     }
 
     if (String(coinType) === ETH_COIN_TYPE_KEY) {
