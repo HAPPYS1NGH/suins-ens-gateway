@@ -4,6 +4,7 @@ import { CID } from 'multiformats/cid'
 import { base32 } from 'multiformats/bases/base32'
 import { base58btc } from 'multiformats/bases/base58'
 
+import { ETH_COIN_TYPE_KEY, resolveNamespace } from '../namespace'
 import { resolveSuins } from '../suins'
 import { ResolverQuery } from './utils'
 
@@ -47,11 +48,12 @@ function encodeEnsContenthash(value: string): `0x${string}` {
 }
 
 /**
- * Resolve an ENS query by looking up the corresponding SUINS name.
+ * Resolve an ENS query by looking up the corresponding SUINS name and, for the
+ * `addr` branch, the public Namespace record.
  *
  * Supported queries:
  * - addr(784)  → SUI target address from SUINS
- * - addr(60)   → returns zero address (no ETH mapping)
+ * - addr(60) / addr(node) → Ethereum address from Namespace
  * - text(key)  → avatar, contentHash, walrusSiteId from SUINS data
  * - contenthash → SUINS contentHash if available
  */
@@ -60,34 +62,37 @@ export async function getRecord(
   query: ResolverQuery
 ): Promise<string> {
   const { functionName, args } = query
-  const nameData = await resolveSuins(name)
+
+  // Fetched in parallel: one page can trigger several of these calls, and a slow
+  // or failing Namespace read must never hold up or break SuiNS resolution.
+  const [nameData, namespaceData] = await Promise.all([
+    resolveSuins(name),
+    resolveNamespace(name),
+  ])
+
+  if (functionName === 'addr') {
+    const coinType = args[1] ?? BigInt(60)
+
+    if (coinType === SUI_COIN_TYPE) {
+      // The canonical Sui address cannot be changed through Namespace.
+      return nameData?.targetAddress ?? zeroAddress
+    }
+
+    if (String(coinType) === ETH_COIN_TYPE_KEY) {
+      return namespaceData?.addresses[ETH_COIN_TYPE_KEY] ?? zeroAddress
+    }
+
+    // Other coin types join in a later phase.
+    return zeroAddress
+  }
 
   if (!nameData) {
-    // Name doesn't exist in SUINS — return empty/zero defaults
-    switch (functionName) {
-      case 'addr':
-        return zeroAddress
-      case 'text':
-        return ''
-      case 'contenthash':
-        return '0x'
-    }
+    // Name doesn't exist in SUINS — return empty/zero defaults for the remaining
+    // SUINS-sourced query types.
+    return functionName === 'text' ? '' : '0x'
   }
 
   switch (functionName) {
-    case 'addr': {
-      const coinType = args[1] ?? BigInt(60)
-
-      if (coinType === SUI_COIN_TYPE) {
-        // Return SUI address as raw bytes
-        // SUI addresses are 32-byte hex strings (0x + 64 hex chars)
-        return nameData.targetAddress ?? zeroAddress
-      }
-
-      // For other coin types, we don't have data
-      return zeroAddress
-    }
-
     case 'text': {
       const key = args[1]
 

@@ -1,0 +1,9 @@
+# Install scripts are blocked globally by ~/.npmrc (ignore-scripts=true). All three
+# ship prebuilt platform binaries as optional deps and resolve them lazily at
+# runtime (verified against their shipped `bin/*` wrapper scripts), so skipping
+# their postinstall is safe: esbuild and workerd both `require.resolve()` the
+# platform package on first run, and sharp is not on any path this package uses.
+allowBuilds:
+  esbuild: false
+  sharp: false
+  workerd: false
