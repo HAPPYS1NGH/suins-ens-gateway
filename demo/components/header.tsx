@@ -2,7 +2,6 @@
 
 import {
   type UiWallet,
-  type UiWalletAccount,
   useCurrentAccount,
   useDAppKit,
   useWalletConnection,
@@ -11,9 +10,10 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { toMessageBytes } from "@/lib/auth/message";
 import type { Session } from "@/lib/auth/session";
 import { truncateAddr } from "@/lib/records";
+import { postJson, useSignIn } from "./use-sign-in";
+import { useWalletCtaLabel } from "./use-wallet-cta";
 
 interface HeaderProps {
   session: Session | null;
@@ -30,22 +30,6 @@ export function Header({ session }: HeaderProps) {
       </div>
     </header>
   );
-}
-
-async function postJson(
-  url: string,
-  body?: unknown,
-): Promise<Record<string, string>> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: body ? { "content-type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.error ?? `Request failed with ${response.status}`);
-  }
-  return data;
 }
 
 function errorMessage(error: unknown): string {
@@ -100,26 +84,8 @@ function WalletMenu({ session }: HeaderProps) {
       setMenuOpen(false);
     });
 
-  const signIn = () =>
-    run(async () => {
-      if (!account) throw new Error("Select an account first");
-
-      const challenge = await postJson("/api/auth/challenge", {
-        suiAddress: account.address,
-      });
-
-      const { signature } = await dAppKit.signPersonalMessage({
-        account,
-        message: toMessageBytes(challenge.message),
-      });
-
-      await postJson("/api/auth/verify", {
-        challengeId: challenge.challengeId,
-        signature,
-      });
-
-      router.refresh();
-    });
+  const signInAction = useSignIn();
+  const signIn = () => run(async () => signInAction());
 
   const signOut = () =>
     run(async () => {
@@ -134,11 +100,7 @@ function WalletMenu({ session }: HeaderProps) {
     });
 
   const activeAddress = session?.suiAddress ?? account?.address;
-  const label = session
-    ? truncateAddr(session.suiAddress)
-    : isConnected
-      ? `Connected: ${truncateAddr(account?.address ?? "")}`
-      : "Connect wallet";
+  const label = useWalletCtaLabel(session);
 
   return (
     <div className="wallet-menu" ref={menuRef}>

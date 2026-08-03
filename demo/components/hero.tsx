@@ -1,6 +1,17 @@
 "use client";
 
+import {
+  type UiWallet,
+  useDAppKit,
+  useWalletConnection,
+  useWallets,
+} from "@mysten/dapp-kit-react";
+import Link from "next/link";
+import { useState } from "react";
+
 import { PixelAvatar } from "./pixel-avatar";
+import { useSignIn } from "./use-sign-in";
+import { useWalletCtaLabel } from "./use-wallet-cta";
 
 function CheckIcon() {
   return (
@@ -41,6 +52,40 @@ const PERKS = [
 ];
 
 export function Hero() {
+  // The Hero only renders when there's no session (see app/page.tsx), so the only
+  // wallet states it cares about are "disconnected" and "connected, not yet signed".
+  const dAppKit = useDAppKit();
+  const wallets = useWallets();
+  const { isConnected } = useWalletConnection();
+  const signIn = useSignIn();
+  const ctaLabel = useWalletCtaLabel(null);
+
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // One click from the landing page: connect the picked wallet, then sign the
+  // challenge with the account `connectWallet` returns — no trip through the nav.
+  const connectAndSignIn = (wallet: UiWallet) =>
+    run(async () => {
+      const { accounts } = await dAppKit.connectWallet({ wallet });
+      if (!accounts[0]) throw new Error("No account available in this wallet");
+      await signIn(accounts[0]);
+    });
+
+  const signInNow = () => run(async () => signIn());
+
   return (
     <section className="claim">
       <div className="claim__head">
@@ -65,31 +110,55 @@ export function Hero() {
             Sign in with your Sui wallet to prove you own a .sui name, then
             edit its ENS records below.
           </p>
-          <button
-            type="button"
-            className="btn claim__cta"
-            onClick={() =>
-              document.getElementById("wallet-connect-trigger")?.click()
-            }
-          >
-            Connect Sui wallet
-          </button>
+
+          {isConnected ? (
+            <button
+              type="button"
+              className="btn claim__cta"
+              onClick={() => void signInNow()}
+              disabled={busy}
+            >
+              {busy ? "Signing…" : ctaLabel}
+            </button>
+          ) : wallets.length === 0 ? (
+            <span className="claim__muted">No Sui wallets detected</span>
+          ) : (
+            <div className="claim__wallets">
+              {wallets.map((wallet) => (
+                <button
+                  key={wallet.name}
+                  type="button"
+                  className="btn claim__cta"
+                  onClick={() => void connectAndSignIn(wallet)}
+                  disabled={busy}
+                >
+                  {wallet.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {error ? (
+            <span className="claim__error" role="alert">
+              {error}
+            </span>
+          ) : null}
         </div>
 
         <aside className="claim__aside">
-          <span className="claim-preview__cap">Preview</span>
-          <div className="claim-preview">
+          <span className="claim-preview__cap">Live example</span>
+          <Link href="/happysingh" className="claim-preview" aria-label="View the live happysingh.sui profile">
             <span className="claim-preview__avatar">
-              <PixelAvatar seed="yourname.sui" size={56} face />
+              <PixelAvatar seed="happysingh.sui" size={56} face />
             </span>
             <div className="claim-preview__meta">
-              <span className="claim-preview__name">yourname.sui</span>
+              <span className="claim-preview__name">happysingh.sui</span>
               <span className="claim-preview__addrlabel">
-                Default receiving address · all EVM chains
+                Resolves at happysingh.onsui.eth
               </span>
-              <span className="claim-preview__wallet">0x0000…0000</span>
+              <span className="claim-preview__wallet">View live profile →</span>
             </div>
-          </div>
+          </Link>
           <ul className="claim-perks">
             {PERKS.map((perk) => (
               <li key={perk}>
