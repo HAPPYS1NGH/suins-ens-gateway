@@ -1,0 +1,273 @@
+/*
+ * Self-contained palette — this card owns its look and does not inherit the
+ * app theme, so it reads the same wherever it is dropped in.
+ */
+.box {
+  --fx-ink: #0b0d12;
+  --fx-surface: #12151d;
+  --fx-line: rgba(255, 255, 255, 0.1);
+  --fx-text: rgba(255, 255, 255, 0.92);
+  --fx-dim: rgba(255, 255, 255, 0.42);
+  --fx-faint: rgba(255, 255, 255, 0.22);
+  --fx-accent: #4da2ff;
+
+  --fx-wallet: #6ea8ff;
+  --fx-eth: #f0a44a;
+  --fx-gw: #4fbf7b;
+  --fx-sui: #4da2ff;
+  --fx-db: #b489f5;
+  --fx-agg: #34b6a8;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-io: cubic-bezier(0.77, 0, 0.175, 1);
+
+  margin: 0;
+  padding: 20px 20px 14px;
+  border: 1px solid var(--fx-line);
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 90% at 80% 0%, rgba(77, 162, 255, 0.08), transparent 60%),
+    var(--fx-ink);
+  color: var(--fx-text);
+  font-family: inherit;
+}
+
+.scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  min-width: 720px;
+  height: auto;
+}
+
+/* Layer groups */
+
+.group rect {
+  fill: rgba(255, 255, 255, 0.015);
+  stroke: var(--fx-faint);
+  stroke-width: 1;
+  stroke-dasharray: 5 5;
+}
+
+.group text {
+  fill: var(--fx-faint);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Nodes */
+
+.node rect {
+  fill: var(--fx-surface);
+  stroke: var(--fx-line);
+  stroke-width: 1;
+  transition:
+    stroke 200ms var(--ease-out),
+    fill 200ms var(--ease-out);
+}
+
+.node {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 220ms var(--ease-out);
+}
+
+.node[data-on="true"] {
+  transform: scale(1.03);
+}
+
+.node[data-on="true"] rect {
+  stroke: var(--tone);
+  fill: color-mix(in srgb, var(--tone) 14%, var(--fx-surface));
+}
+
+.node[data-tone="wallet"] {
+  --tone: var(--fx-wallet);
+}
+.node[data-tone="eth"] {
+  --tone: var(--fx-eth);
+}
+.node[data-tone="gw"] {
+  --tone: var(--fx-gw);
+}
+.node[data-tone="sui"] {
+  --tone: var(--fx-sui);
+}
+.node[data-tone="db"] {
+  --tone: var(--fx-db);
+}
+.node[data-tone="agg"] {
+  --tone: var(--fx-agg);
+}
+
+.nodeLabel {
+  fill: var(--fx-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-anchor: middle;
+  transition: fill 200ms var(--ease-out);
+}
+
+.node[data-on="true"] .nodeLabel {
+  fill: var(--tone);
+}
+
+.nodeSub {
+  fill: var(--fx-dim);
+  font-size: 10.5px;
+  text-anchor: middle;
+}
+
+/* Edges */
+
+.edge {
+  fill: none;
+  stroke: var(--fx-faint);
+  stroke-width: 1.25;
+  transition: stroke 220ms var(--ease-out);
+}
+
+.edge[data-on="true"] {
+  stroke: var(--fx-accent);
+}
+
+.headDim {
+  fill: var(--fx-faint);
+}
+
+.headOn {
+  fill: var(--fx-accent);
+}
+
+.edgeNum {
+  fill: var(--fx-faint);
+  font-size: 11px;
+  font-weight: 600;
+  text-anchor: middle;
+  transition: fill 220ms var(--ease-out);
+}
+
+.edgeNum[data-on="true"] {
+  fill: var(--fx-accent);
+}
+
+/* Travelling packet — remounted each beat, so it always starts clean. */
+
+.packet {
+  fill: var(--fx-accent);
+  filter: drop-shadow(0 0 6px var(--fx-accent));
+  offset-distance: 0%;
+  opacity: 0;
+  animation: fx-flow 1500ms var(--ease-io) forwards;
+}
+
+@keyframes fx-flow {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  78% {
+    offset-distance: 100%;
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* Caption + rail */
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--fx-line);
+}
+
+.caption {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  min-height: 38px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--fx-text);
+  animation: fx-caption 260ms var(--ease-out);
+}
+
+@keyframes fx-caption {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.step {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fx-accent) 20%, transparent);
+  color: var(--fx-accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--fx-faint);
+  cursor: pointer;
+  transition:
+    background 200ms var(--ease-out),
+    transform 160ms var(--ease-out);
+}
+
+.dot[data-on="true"] {
+  background: var(--fx-accent);
+  transform: scale(1.35);
+}
+
+.dot:active {
+  transform: scale(0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .packet {
+    display: none;
+  }
+
+  .node,
+  .caption {
+    transition: none;
+    animation: none;
+    transform: none;
+  }
+
+  .node[data-on="true"] {
+    transform: none;
+  }
+}
