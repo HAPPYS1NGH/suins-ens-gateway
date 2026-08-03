@@ -1177,12 +1177,6 @@ select.input {
   transform: translateY(-1px);
 }
 
-.pcard__pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .pcard__pill-label {
   font-size: 0.6875rem;
   font-weight: 700;

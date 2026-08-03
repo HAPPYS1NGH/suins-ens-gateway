@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChainName } from "@thenamespace/offchain-manager";
+import { ChainName } from "@thenamespace/offchain-manager";
 
 import {
   CHAIN_LABELS,
@@ -16,20 +16,26 @@ import { CopyButton } from "./copy-button";
 interface AddressRecordsProps {
   /** Raw Namespace addresses, keyed by SLIP-44 coin type. */
   addresses: Record<string, string>;
+  /**
+   * SuiNS target address (coin type 784), read from Sui. Read-only — never written
+   * from here — but shown as the table's first row so the name's native chain has a
+   * home alongside the ENS-sourced ones.
+   */
+  suiAddress?: string | null;
 }
 
 /**
  * Set chains first in `DISPLAY_CHAINS` order, then the rest as empty rows so adding
- * one is still discoverable. Unknown coin types and SuiNS-served chains are dropped,
- * matching the server merge — an address the write path could not round-trip, or the
- * gateway would never serve, is not claimed here.
+ * one is still discoverable. Unknown coin types and SuiNS-served chains are dropped
+ * from the Namespace half, matching the server merge — the Sui row is sourced
+ * separately from `suiAddress` so a stale 784 record can never displace it.
  */
-export function AddressRecords({ addresses }: AddressRecordsProps) {
+export function AddressRecords({ addresses, suiAddress }: AddressRecordsProps) {
   const byChain = new Map<ChainName, string>();
   for (const [key, value] of Object.entries(addresses)) {
     const chain = chainNameFromAddressKey(key);
     // Reserved chains are served from SuiNS, so a Namespace value for one is never
-    // what resolves — `SuinsRecords` shows the real source instead.
+    // what resolves — the Sui row below shows the real source instead.
     if (chain && !RESERVED_CHAINS.has(chain) && value.trim()) byChain.set(chain, value.trim());
   }
 
@@ -48,8 +54,14 @@ export function AddressRecords({ addresses }: AddressRecordsProps) {
       </h2>
 
       <div className="precords">
+        <AddressRow
+          key={ChainName.Sui}
+          chain={ChainName.Sui}
+          value={suiAddress?.trim() || undefined}
+          index={0}
+        />
         {[...set, ...unset].map((chain, index) => (
-          <AddressRow key={chain} chain={chain} value={byChain.get(chain)} index={index} />
+          <AddressRow key={chain} chain={chain} value={byChain.get(chain)} index={index + 1} />
         ))}
       </div>
     </section>

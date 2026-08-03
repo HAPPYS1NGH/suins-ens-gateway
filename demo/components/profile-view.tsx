@@ -23,9 +23,6 @@ interface ProfileViewProps {
   canEdit: boolean;
 }
 
-/** ENSIP-11 coin type for Ethereum, the key Namespace returns `eth` addresses under. */
-const ETH_COIN_TYPE = "60";
-
 export function ProfileView({ name, initialProfile, suins, canEdit }: ProfileViewProps) {
   const [profile, setProfile] = useState<RecordProfile | null>(initialProfile);
   const [editing, setEditing] = useState(false);
@@ -55,14 +52,12 @@ export function ProfileView({ name, initialProfile, suins, canEdit }: ProfileVie
 
       <ProfileCard
         name={name}
-        suiAddress={suins.targetAddress}
-        ethAddress={addresses[ETH_COIN_TYPE] ?? null}
         avatar={suins.avatar}
         contentHash={suins.contentHash}
         texts={texts}
       />
 
-      <AddressRecords addresses={addresses} />
+      <AddressRecords addresses={addresses} suiAddress={suins.targetAddress} />
 
       <SuinsRecords {...suins} />
 

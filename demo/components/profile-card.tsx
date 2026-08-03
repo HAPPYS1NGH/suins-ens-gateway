@@ -9,8 +9,6 @@ import {
 } from "@/lib/records";
 
 import { CopyButton } from "./copy-button";
-import { ChainEthereumIcon } from "./icons/chain/ethereum";
-import { ChainSuiIcon } from "./icons/chain/sui";
 import {
   DiscordLogo,
   FarcasterLogo,
@@ -27,10 +25,6 @@ import { PixelAvatar } from "./pixel-avatar";
 interface ProfileCardProps {
   /** SuiNS name, e.g. `alice.sui`. */
   name: string;
-  /** SuiNS target address for the name — read from Sui, `null` when unset. */
-  suiAddress: string | null;
-  /** The `60` address record, when the holder has set one. */
-  ethAddress: string | null;
   /** SuiNS avatar image URL — overlaid on the pixel avatar when set. */
   avatar: string | null;
   /** SuiNS content hash (`contenthash()`), shown as the "Site" pill when set. */
@@ -49,16 +43,14 @@ const SOCIAL_GLYPHS: Record<string, typeof XLogo> = {
 };
 
 /**
- * Identity block: who this name is, the addresses worth surfacing above the fold,
- * and every text record as a chip. The Sui address comes from SuiNS, the ETH address
- * is an ENS record; both render as branded pills. The SuiNS content hash renders as a
- * "Site" pill beneath the social chips — a decentralized-website reference, not a
- * social, so it is labelled for what it points at rather than the wire field name.
+ * Identity block: who this name is and every text record as a chip. Addresses live
+ * in the Addresses table below — the chain logos there are enough, so the card no
+ * longer duplicates them as pills. The SuiNS content hash still renders here as a
+ * "Site" pill beneath the social chips: a decentralized-website reference, not a
+ * social, labelled for what it points at rather than the wire field name.
  */
 export function ProfileCard({
   name,
-  suiAddress,
-  ethAddress,
   avatar,
   contentHash,
   texts,
@@ -106,15 +98,6 @@ export function ProfileCard({
             <span className="pcard__badge">Name holder</span>
           </div>
           <span className="pcard__ens mono muted">{toEnsName(name)}</span>
-
-          <div className="pcard__pills">
-            {suiAddress ? (
-              <AddressPill icon={<ChainSuiIcon />} label="Sui" value={suiAddress} />
-            ) : null}
-            {ethAddress ? (
-              <AddressPill icon={<ChainEthereumIcon />} label="ETH" value={ethAddress} />
-            ) : null}
-          </div>
 
           {bio ? <p className="pcard__bio">{bio}</p> : null}
 

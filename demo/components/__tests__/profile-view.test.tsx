@@ -86,7 +86,7 @@ describe("ProfileView", () => {
     expect(screen.queryByText("0xdecoy")).toBeNull();
   });
 
-  it("brands the Sui address pill with the Sui logo, not a status dot", () => {
+  it("leads the Addresses table with the SuiNS target address and Sui logo", () => {
     const { container } = render(
       <ProfileView
         name="alice.sui"
@@ -96,10 +96,16 @@ describe("ProfileView", () => {
       />,
     );
 
-    // The pill's mark slot holds an SVG (the Sui brand mark), not the bare dot.
-    const mark = container.querySelector(".pcard__pill-mark");
-    expect(mark).toBeTruthy();
-    expect(mark?.querySelector("svg")).toBeTruthy();
+    // The Sui row is always present; when set it carries the address + a copy button.
+    expect(screen.getByRole("button", { name: "Copy Sui address" })).toBeTruthy();
+    const suiRow = screen.getByText("Sui").closest(".paddr");
+    // The row's chain mark is the Sui brand SVG (the class lives on the svg itself),
+    // not a monogram fallback tile.
+    const mark = suiRow?.querySelector(".chainmark");
+    expect(mark?.tagName.toLowerCase()).toBe("svg");
+    // Sui is the table's first row — it comes before the Ethereum row.
+    const rows = container.querySelectorAll(".paddr");
+    expect(rows[0]?.textContent).toContain("Sui");
   });
 
   it("shows the SuiNS content hash as a Site pill under the socials", () => {
@@ -135,7 +141,7 @@ describe("ProfileView", () => {
     expect(screen.queryByText("Avatar")).toBeNull();
   });
 
-  it("shows the ETH pill from the coin-type-60 record", () => {
+  it("shows the Ethereum address from the coin-type-60 record in the table", () => {
     render(
       <ProfileView
         name="alice.sui"
@@ -145,9 +151,10 @@ describe("ProfileView", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Copy ETH address" })).toBeTruthy();
-    // Same value surfaces twice by design: the top pill and the Ethereum row.
-    expect(screen.getAllByTitle(ETH)).toHaveLength(2);
+    // The card no longer duplicates the address as a pill; the table row is the
+    // only surface, so the value appears once and the copy button uses the chain name.
+    expect(screen.getByRole("button", { name: "Copy Ethereum address" })).toBeTruthy();
+    expect(screen.getAllByTitle(ETH)).toHaveLength(1);
   });
 
   it("hides the edit affordance from a visitor who is not the holder", () => {
