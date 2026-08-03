@@ -275,7 +275,6 @@ body {
   transform: translateY(10px);
   transition: opacity 0.3s, transform 0.3s;
   pointer-events: none;
-  position: relative;
 }
 
 .result.show {
@@ -285,7 +284,30 @@ body {
 }
 
 .result-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 12px;
+}
+
+.avatar-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-dim);
+  object-fit: cover;
+  display: none;
+}
+
+.avatar-img.show {
+  display: block;
+}
+
+.result-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
 }
 
 .chain-badge {
@@ -322,20 +344,34 @@ body {
   }
 }
 
+.sui-name {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: none;
+}
+
+.sui-name.show {
+  display: inline;
+}
+
+.result-address-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
 .result-address {
   font-family: 'Space Mono', monospace;
   font-size: 0.875rem;
   word-break: break-all;
   line-height: 1.6;
   color: var(--text);
-  padding-right: 40px;
+  flex: 1;
 }
 
 .copy-btn {
-  position: absolute;
-  top: 50%;
-  right: 20px;
-  transform: translateY(-50%);
+  flex-shrink: 0;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -353,6 +389,36 @@ body {
 .copy-btn.copied {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+.content-link {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 16px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(0, 255, 148, 0.15);
+  border-radius: 10px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.content-link.show {
+  display: inline-flex;
+}
+
+.content-link:hover {
+  background: rgba(0, 255, 148, 0.2);
+  border-color: rgba(0, 255, 148, 0.3);
+}
+
+.content-link-arrow {
+  margin-left: auto;
+  font-size: 0.9rem;
 }
 
 /* Error */

@@ -1,0 +1,13 @@
+import type { SVGProps } from 'react'
+
+export const ChainEvmIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="none" viewBox="0 0 32 32" {...props}>
+    <path fill="#40477A" d="M0 0h32v32H0z" />
+    <path fill="#C8B2F5" fillRule="evenodd" d="m22 17.337-6 7.956v-4.467l6-3.49Z" clipRule="evenodd" />
+    <path fill="#EECBC0" fillRule="evenodd" d="m10 17.337 6 7.956v-4.467l-6-3.49Z" clipRule="evenodd" />
+    <path fill="#87A9F0" fillRule="evenodd" d="m10 16.415 6-2.668v6.082l-6-3.414Z" clipRule="evenodd" />
+    <path fill="#CAB3F5" fillRule="evenodd" d="m22 16.415-6.001-2.668v6.082l6-3.414Z" clipRule="evenodd" />
+    <path fill="#EECBC0" fillRule="evenodd" d="M10 16.415 16 7v6.747l-6 2.668Z" clipRule="evenodd" />
+    <path fill="#B8FBF6" fillRule="evenodd" d="M21.998 16.415 16 7v6.747l6 2.668Z" clipRule="evenodd" />
+  </svg>
+)

@@ -1,12 +1,12 @@
-import { SuinsClient } from '@mysten/suins'
-import { getFullnodeUrl, SuiClient } from '@mysten/sui/client'
+import { SuiGrpcClient } from '@mysten/sui/grpc'
+import { suins } from '@mysten/suins'
 
-const suiClient = new SuiClient({ url: getFullnodeUrl('mainnet') })
-
-const suinsClient = new SuinsClient({
-  client: suiClient as any,
+// Sui's public JSON-RPC endpoint no longer serves the methods SuiNS resolution
+// needs ("Method not found"); the gRPC transport is the currently-supported path.
+const suiClient = new SuiGrpcClient({
   network: 'mainnet',
-})
+  baseUrl: 'https://fullnode.mainnet.sui.io:443',
+}).$extend(suins())
 
 // The parent ENS domain we serve subnames for
 const PARENT_DOMAIN = 'onsui.eth'
@@ -38,15 +38,30 @@ export async function resolveSuins(ensName: string): Promise<SuinsRecord | null>
   const suiName = toSuiName(ensName)
 
   try {
-    const nameRecord = await suinsClient.getNameRecord(suiName)
+    const nameRecord = await suiClient.suins.getNameRecord(suiName)
 
     if (!nameRecord) {
       return null
     }
 
+    // Resolve avatar Sui object ID to its display image_url
+    let avatarUrl: string | null = null
+    if (nameRecord.avatar) {
+      try {
+        const { object } = await suiClient.core.getObject({
+          objectId: nameRecord.avatar,
+          include: { display: true },
+        })
+        const displayFields = object.display?.output as Record<string, string> | null | undefined
+        avatarUrl = displayFields?.image_url ?? null
+      } catch {
+        avatarUrl = null
+      }
+    }
+
     return {
       targetAddress: nameRecord.targetAddress ?? null,
-      avatar: nameRecord.avatar ?? null,
+      avatar: avatarUrl,
       contentHash: nameRecord.contentHash ?? null,
       walrusSiteId: nameRecord.walrusSiteId ?? null,
     }

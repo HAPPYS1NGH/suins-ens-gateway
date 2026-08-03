@@ -8,7 +8,7 @@ const SUI_COIN_TYPE = 784
 
 const publicClient = createPublicClient({
   chain: mainnet,
-  transport: http(),
+  transport: http('https://lb.drpc.live/ethereum/AgdZ5qspL0mEhBDVZYjN4FwjX_Dm-68R8LLleho1c5bd'),
 })
 
 const ensInput = document.getElementById('ensName')
@@ -20,6 +20,9 @@ const resultDiv = document.getElementById('result')
 const suiAddressDiv = document.getElementById('suiAddress')
 const errorDiv = document.getElementById('error')
 const copyBtn = document.getElementById('copyBtn')
+const avatarImg = document.getElementById('avatarImg')
+const suiNameEl = document.getElementById('suiName')
+const contentLink = document.getElementById('contentLink')
 
 // Build full ENS name from input
 function getFullEnsName(input) {
@@ -53,16 +56,48 @@ async function resolveAddress() {
   setLoading(true)
   resultDiv.classList.remove('show')
   errorDiv.classList.remove('show')
+  resetRecords()
 
   try {
+    const normalized = normalize(ensName)
+
     const suiAddress = await publicClient.getEnsAddress({
-      name: normalize(ensName),
+      name: normalized,
       coinType: SUI_COIN_TYPE,
     })
 
     if (suiAddress) {
       suiAddressDiv.textContent = suiAddress
       resultDiv.classList.add('show')
+
+      // Fetch avatar, content hash, and .sui name in parallel
+      const [avatarResult, contentHashResult, suiNameResult] = await Promise.allSettled([
+        publicClient.getEnsText({ name: normalized, key: 'avatar' }),
+        publicClient.getEnsText({ name: normalized, key: 'contentHash' }),
+        publicClient.getEnsText({ name: normalized, key: 'org.suins.name' }),
+      ])
+
+      // Avatar
+      const avatar = avatarResult.status === 'fulfilled' ? avatarResult.value : null
+      if (avatar) {
+        avatarImg.src = avatar
+        avatarImg.alt = `${rawInput} avatar`
+        avatarImg.classList.add('show')
+      }
+
+      // .sui name
+      const suiName = suiNameResult.status === 'fulfilled' ? suiNameResult.value : null
+      if (suiName) {
+        suiNameEl.textContent = suiName
+        suiNameEl.classList.add('show')
+      }
+
+      // Content hash → eth.limo link
+      const contentHash = contentHashResult.status === 'fulfilled' ? contentHashResult.value : null
+      if (contentHash) {
+        contentLink.href = `https://${ensName.replace('.onsui.eth', '')}.onsui.eth.limo`
+        contentLink.classList.add('show')
+      }
     } else {
       showError(`No SUI address found for @${rawInput}`)
     }
@@ -76,6 +111,15 @@ async function resolveAddress() {
   } finally {
     setLoading(false)
   }
+}
+
+function resetRecords() {
+  avatarImg.src = ''
+  avatarImg.classList.remove('show')
+  suiNameEl.textContent = ''
+  suiNameEl.classList.remove('show')
+  contentLink.href = ''
+  contentLink.classList.remove('show')
 }
 
 function setLoading(loading) {
