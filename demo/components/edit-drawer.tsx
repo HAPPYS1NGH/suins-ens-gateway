@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef } from "react";
 interface EditDrawerProps {
   open: boolean;
   title: string;
+  /** The name being edited, shown under the title. */
+  subtitle?: string;
   /** Blocks Escape and the close button while a save is in flight. */
   busy?: boolean;
   onClose: () => void;
@@ -19,7 +21,7 @@ const FOCUSABLE =
  * refuses to close mid-save so a half-written record set is never dismissed by a
  * stray Escape.
  */
-export function EditDrawer({ open, title, busy, onClose, children }: EditDrawerProps) {
+export function EditDrawer({ open, title, subtitle, busy, onClose, children }: EditDrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
 
@@ -82,10 +84,14 @@ export function EditDrawer({ open, title, busy, onClose, children }: EditDrawerP
         aria-modal="true"
         aria-labelledby="drawer-title"
       >
+        <div className="drawer__accent" aria-hidden="true" />
         <header className="drawer__head">
-          <h2 className="drawer__title" id="drawer-title">
-            {title}
-          </h2>
+          <div className="drawer__heading">
+            <h2 className="drawer__title" id="drawer-title">
+              {title}
+            </h2>
+            {subtitle ? <p className="drawer__subtitle mono muted">{subtitle}</p> : null}
+          </div>
           <button
             type="button"
             className="drawer__close"

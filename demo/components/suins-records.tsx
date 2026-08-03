@@ -20,16 +20,12 @@ export interface SuinsRecordsProps {
  *
  * Renders nothing when the name has none of them set, which is the common case.
  */
-export function SuinsRecords({
-  targetAddress,
-  contentHash,
-  walrusSiteId,
-}: SuinsRecordsProps) {
-  // `avatar` is rendered in the profile card, overlaid on the pixel avatar, so it
-  // is deliberately not repeated here as a row.
+export function SuinsRecords({ walrusSiteId }: SuinsRecordsProps) {
+  // `avatar`, `targetAddress`, and `contentHash` are rendered in the profile card
+  // (avatar overlay, the Sui address pill, the "Site" pill respectively), so they
+  // are deliberately not repeated here as rows. Walrus has no card surface of its
+  // own, so it stays in this read-only section.
   const rows = [
-    { label: "Sui address", key: "addr(784)", value: targetAddress },
-    { label: "Content hash", key: "contenthash()", value: contentHash },
     { label: "Walrus site", key: 'text("walrusSiteId")', value: walrusSiteId },
   ].filter((row): row is { label: string; key: string; value: string } =>
     Boolean(row.value),

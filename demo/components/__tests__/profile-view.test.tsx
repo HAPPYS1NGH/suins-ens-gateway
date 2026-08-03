@@ -86,6 +86,38 @@ describe("ProfileView", () => {
     expect(screen.queryByText("0xdecoy")).toBeNull();
   });
 
+  it("brands the Sui address pill with the Sui logo, not a status dot", () => {
+    const { container } = render(
+      <ProfileView
+        name="alice.sui"
+        suins={suins({ targetAddress: OWNER })}
+        initialProfile={null}
+        canEdit={false}
+      />,
+    );
+
+    // The pill's mark slot holds an SVG (the Sui brand mark), not the bare dot.
+    const mark = container.querySelector(".pcard__pill-mark");
+    expect(mark).toBeTruthy();
+    expect(mark?.querySelector("svg")).toBeTruthy();
+  });
+
+  it("shows the SuiNS content hash as a Site pill under the socials", () => {
+    render(
+      <ProfileView
+        name="alice.sui"
+        suins={suins({ contentHash: "QmHashExample1234567890abcdef" })}
+        initialProfile={profile()}
+        canEdit={false}
+      />,
+    );
+
+    // Labelled "Site" — never the wire field name "content hash".
+    expect(screen.getByText("Site")).toBeTruthy();
+    expect(screen.queryByText(/content hash/i)).toBeNull();
+    expect(screen.getByRole("button", { name: "Copy Site content reference" })).toBeTruthy();
+  });
+
   it("overlays the SuiNS avatar on the pixel avatar, not as a separate row", () => {
     render(
       <ProfileView

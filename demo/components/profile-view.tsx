@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 
 import { AddressRecords } from "./address-records";
 import { EditDrawer } from "./edit-drawer";
+import { PencilIcon } from "./icons/social";
 import { ProfileCard } from "./profile-card";
 import { RecordEditor, type RecordProfile } from "./record-editor";
 import { SuinsRecords, type SuinsRecordsProps } from "./suins-records";
@@ -41,14 +42,24 @@ export function ProfileView({ name, initialProfile, suins, canEdit }: ProfileVie
 
   return (
     <>
+      {canEdit ? (
+        // Sits above the card rather than absolute-positioned over it, so it never
+        // collides with the social chips on the right of the identity block.
+        <div className="profile__topbar">
+          <button type="button" className="profile__edit" onClick={() => setEditing(true)}>
+            <PencilIcon />
+            Edit profile
+          </button>
+        </div>
+      ) : null}
+
       <ProfileCard
         name={name}
         suiAddress={suins.targetAddress}
         ethAddress={addresses[ETH_COIN_TYPE] ?? null}
         avatar={suins.avatar}
+        contentHash={suins.contentHash}
         texts={texts}
-        canEdit={canEdit}
-        onEdit={() => setEditing(true)}
       />
 
       <AddressRecords addresses={addresses} />
@@ -59,6 +70,7 @@ export function ProfileView({ name, initialProfile, suins, canEdit }: ProfileVie
         <EditDrawer
           open={editing}
           title="Edit profile"
+          subtitle={name}
           busy={saving}
           onClose={() => setEditing(false)}
         >
