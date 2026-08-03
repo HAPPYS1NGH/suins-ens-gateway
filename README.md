@@ -1,6 +1,8 @@
 # SUINS x ENS Bridge
 
-Look up any [Sui Name Service (SUINS)](https://suins.io) name through [ENS](https://ens.domains). No registration, no database, nothing to set up.
+Look up any [Sui Name Service (SUINS)](https://suins.io) name through [ENS](https://ens.domains). SuiNS is the source of truth for Sui-native fields; name holders layer extra records (other-chain addresses, text) on top via [Namespace](https://namespace.tech).
+
+**Live app**: [suins-ens-gateway.vercel.app](https://suins-ens-gateway.vercel.app/)
 
 Query `happysingh.onsui.eth` and get back `happysingh.sui` data from SUINS: address, avatar, IPFS content hash.
 
@@ -85,27 +87,39 @@ More examples in [`examples/`](./examples).
 ```
 ┌──────────────┐     ┌──────────────────┐     ┌─────────────┐     ┌───────────┐
 │  ENS Client  │────▶│  SUINSResolver   │────▶│   Gateway   │────▶│   SUINS   │
-│  (viem, etc) │     │  (Ethereum L1)   │     │ (CF Worker) │     │ (Sui L1)  │
+│  (viem, etc) │     │  (Ethereum L1)   │     │ (CF Worker) │────▶│ (Sui L1)  │
 └──────────────┘     └──────────────────┘     └─────────────┘     └───────────┘
+                                                       │
+                                                       └────▶┌────────────┐
+                                                             │ Namespace  │
+                                                             │ (offchain) │
+                                                             └────────────┘
 ```
 
 1. User queries `happysingh.onsui.eth` through any ENS client (viem, ethers, etc.)
 2. SUINSResolver on Ethereum reverts with `OffchainLookup` ([EIP-3668](https://eips.ethereum.org/EIPS/eip-3668)), which tells the client to call the gateway
-3. Gateway strips `onsui.eth`, queries SUINS for `happysingh.sui` on Sui mainnet
-4. Gateway signs the response and returns it
+3. Gateway strips `onsui.eth` and resolves `happysingh.sui` from **SuiNS** and the matching **Namespace** record in parallel
+4. Gateway picks one value per field under a fixed precedence policy, signs the response, and returns it
 5. SUINSResolver verifies the signature on-chain and returns the data
 
-There is no database. SUINS is the only source of truth.
+There is no gateway-side database. SuiNS is the source of truth for Sui-native fields; Namespace holds the records name holders add on top (other-chain addresses, arbitrary text).
 
 ## What you can query
 
-| ENS Query | SUINS Source | Notes |
-|-----------|-------------|-------|
-| `addr(784)` | `targetAddress` | SUI address ([SLIP-44](https://github.com/nichanank/slip-0044) coin type 784) |
-| `contenthash()` | `content_hash` | IPFS CID → ENSIP-7 encoded (`0xe301` + CIDv1 bytes) |
-| `text("avatar")` | `avatar` object → `display.image_url` | Fetches Sui NFT object's Display metadata for the image URL |
-| `text("walrusSiteId")` | `walrus_site_id` | Walrus Site object ID on Sui |
+The gateway reads **two sources** and picks one value per field under a fixed precedence policy (see [ARCHITECTURE](ARCHITECTURE.md#record-precedence)):
+
+- **SuiNS** — the canonical on-chain `.sui` name record.
+- **[Namespace](https://namespace.tech)** — an offchain record store the demo writes to via `@thenamespace/offchain-manager`. Lets a name holder add records SuiNS doesn't have (other-chain addresses, arbitrary text keys).
+
+| ENS Query | Source | Notes |
+|-----------|--------|-------|
+| `addr(784)` | SuiNS only | SUI address ([SLIP-44](https://github.com/nichanank/slip-0044) coin type 784). Cannot be overridden. |
+| `addr(60)` / other coin types | Namespace | Multi-chain addresses, ENSIP-9 encoded. EVM L2 chain IDs are remapped to ENSIP-11 coin types (`0x80000000 \| chainId`). |
+| `contenthash()` | SuiNS, fallback Namespace | IPFS CID → ENSIP-7 encoded (`0xe301` + CIDv1 bytes) |
+| `text("avatar")` | SuiNS, fallback Namespace | SuiNS avatar: Sui NFT object → `display.image_url` |
+| `text("contentHash")` / `text("walrusSiteId")` / `text("walrus")` | SuiNS only | `walrusSiteId` = Walrus Site object ID on Sui |
 | `text("org.suins.name")` | derived | The original `.sui` name |
+| `text(<any other key>)` | Namespace | Arbitrary text records set by the name holder |
 
 ### Content hash encoding
 
@@ -134,19 +148,29 @@ ENS:  "https://img.sm.xyz/0x93835f02ddb5d19f111d6c3da5c0cccc095d0848cd25e555ac39
 ## Project structure
 
 ```
-├── frontend/                   # Demo web app (Vite + viem)
-│   ├── index.html              # Single-page resolver UI
-│   ├── src/
-│   │   ├── main.js             # ENS resolution logic (addr, avatar, contenthash)
-│   │   └── style.css           # Dark theme styles
-│   └── vite.config.js          # IPFS-compatible relative base path
+├── demo/                      # Wallet-first demo app (Next.js + viem)
+│   ├── app/                    # Pages + API routes
+│   │   ├── page.tsx            # Hero (signed out) / name workspace (signed in)
+│   │   ├── [name]/page.tsx     # Public profile: ENS records for {name}.onsui.eth
+│   │   └── api/                # auth (challenge/verify/logout), names/list, records
+│   ├── components/             # name-grid, profile-view, edit-drawer, record-editor
+│   ├── lib/
+│   │   ├── auth/               # Sui wallet sign-in, Upstash Redis sessions
+│   │   ├── namespace/          # Namespace offchain record upsert/schema
+│   │   ├── suins/              # SuiNS client, name ownership, profile reads
+│   │   └── records.ts          # {name}.onsui.eth ↔ {name}.sui label helpers
+│   └── package.json
+│
+├── frontend/                   # Minimal single-page resolver (Vite + viem)
 │
 ├── gateway/                    # Cloudflare Worker (CCIP-Read gateway)
 │   ├── src/
 │   │   ├── index.ts            # Router + CF Worker entry
-│   │   ├── suins.ts            # SUINS client, name resolution, avatar lookup
+│   │   ├── suins.ts            # SuiNS client, name resolution, avatar lookup
+│   │   ├── namespace.ts        # Namespace offchain client, ENSIP-11 chain remap
 │   │   ├── ccip-read/
-│   │   │   ├── query.ts        # ENS query → SUINS data + ENSIP-7 encoding
+│   │   │   ├── query.ts        # ENS query → resolve + ENSIP-7/9 encoding
+│   │   │   ├── precedence.ts  # Fixed SuiNS/Namespace value selection policy
 │   │   │   └── utils.ts        # CCIP-Read decode/encode/sign
 │   │   └── handlers/
 │   │       └── getCcipRead.ts  # /lookup/:sender/:data.json endpoint
@@ -180,6 +204,7 @@ ENS:  "https://img.sm.xyz/0x93835f02ddb5d19f111d6c3da5c0cccc095d0848cd25e555ac39
 
 | Component | Address / URL |
 |-----------|--------------|
+| Demo app | [`suins-ens-gateway.vercel.app`](https://suins-ens-gateway.vercel.app/) |
 | SUINSResolver | [`0x7974AF8BD3AEe4fe9f8833361fBc3249E3b23aB3`](https://etherscan.io/address/0x7974AF8BD3AEe4fe9f8833361fBc3249E3b23aB3#code) |
 | Gateway | [`suins-ens-gateway.happys1ngh.workers.dev`](https://suins-ens-gateway.happys1ngh.workers.dev/health) |
 | Signer | `0xb29CC6c4fAb0981ee959110C7055FA365fEe2095` |
@@ -222,15 +247,28 @@ npx tsx test-decode.ts happysingh --prod
 npx tsx test-contenthash.ts happysingh --prod
 ```
 
+## Demo app
+
+`demo/` is a wallet-first UI on top of the bridge. A Sui wallet signs in (challenge/response, sessions in Upstash Redis), sees every SuiNS name it holds, and opens any of them at `/{name}` — a public profile showing the ENS records resolvable at `{name}.onsui.eth`, with an inline edit drawer that writes new records to Namespace. The first save creates the offchain record; nothing is pre-created on browse.
+
+```bash
+cd demo
+pnpm install
+cp .env.example .env   # Upstash Redis, Namespace API key, gateway URL
+pnpm dev
+```
+
 ## Tech stack
 
 | Component | Technology |
 |-----------|-----------|
-| Frontend | Vanilla JS, Vite, `viem` |
+| Demo app | Next.js 16, React 19, `@mysten/dapp-kit-react`, `viem`, Upstash Redis |
+| Namespace | `@thenamespace/offchain-manager` (offchain records the demo writes, the gateway reads) |
+| Frontend (minimal) | Vanilla JS, Vite, `viem` |
 | Gateway | TypeScript, Cloudflare Workers |
 | Contract | Solidity 0.8.24, Hardhat, OpenZeppelin |
 | SUINS | `@mysten/suins`, `@mysten/sui` |
-| ENS | `viem`, `multiformats` |
+| ENS | `viem`, `multiformats`, `@ensdomains/address-encoder` |
 | Resolution | CCIP-Read (EIP-3668) |
 
 ## License
