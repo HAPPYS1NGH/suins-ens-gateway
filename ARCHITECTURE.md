@@ -18,18 +18,26 @@ sequenceDiagram
     participant Contract as SUINSResolver<br/>(Ethereum)
     participant Gateway as Gateway API<br/>(Cloudflare Workers)
     participant Sui as Sui Mainnet<br/>(SuiNS)
+    participant NS as Namespace<br/>(offchain)
 
     Client->>Contract: resolve("happysingh.onsui.eth")
     Contract-->>Client: OffchainLookup error<br/>(gateway URL + calldata)
     Client->>Gateway: GET /lookup/{sender}/{data}.json
-    Gateway->>Sui: Query "happysingh.sui"
-    Sui-->>Gateway: Return name record
-    Gateway->>Gateway: Sign response with private key
+    par Resolve in parallel
+        Gateway->>Sui: Query "happysingh.sui"
+        Sui-->>Gateway: SuiNS record
+    and
+        Gateway->>NS: Read offchain record
+        NS-->>Gateway: Namespace record
+    end
+    Gateway->>Gateway: Select per precedence policy,<br/>sign response
     Gateway-->>Client: {data: encodedResponse}
     Client->>Contract: resolveWithProof(response)
     Contract->>Contract: Verify signature
     Contract-->>Client: Return verified data
 ```
+
+The gateway reads **two sources** and merges them under a fixed policy — SuiNS for Sui-native fields, [Namespace](https://namespace.tech) for everything a name holder adds on top.
 
 ## Components
 
@@ -53,9 +61,9 @@ The gateway is a Cloudflare Worker that:
 1. Receives CCIP-Read requests at `/lookup/{sender}/{data}.json`
 2. Decodes the calldata to figure out what you're asking for
 3. Maps `happysingh.onsui.eth` → `happysingh.sui`
-4. Queries Sui mainnet using `@mysten/suins` client
-5. Formats the response (SUI address, avatar, contenthash, etc.)
-6. Signs it with the private key
+4. Resolves the name from **SuiNS** and **Namespace** in parallel
+5. Selects one value per field under the precedence policy and encodes it (ENSIP-7/9)
+6. Signs the response with the private key
 7. Returns JSON: `{data: "0x..."}`
 
 The signing happens in [`gateway/src/ccip-read/utils.ts`](gateway/src/ccip-read/utils.ts). The signature covers:
@@ -77,23 +85,42 @@ This file handles the Sui → ENS name mapping:
 
 It returns `targetAddress`, `avatar`, `contentHash`, and `walrusSiteId` from the SuiNS name object.
 
-### 4. Query handler
+### 4. Namespace client
 
-[`gateway/src/ccip-read/query.ts`](gateway/src/ccip-read/query.ts)
+[`gateway/src/namespace.ts`](gateway/src/namespace.ts)
 
-This maps ENS queries to SuiNS fields:
+Reads the matching offchain record from [Namespace](https://namespace.tech) using `@thenamespace/offchain-manager`. Public reads need no credential (only the demo's mutations use a `NAMESPACE_API_KEY`). Namespace stores multi-chain addresses keyed by raw EVM chain ID (e.g. Base → `"8453"`); the gateway remaps these to ENSIP-11 coin types (`0x80000000 | chainId`) so `addr(node, coinType)` resolves them through `@ensdomains/address-encoder`. Results are cached for 60s.
 
-| ENS function | SuiNS field | Notes |
-|--------------|-------------|-------|
-| `addr(784)` | `targetAddress` | Returns 32-byte SUI address |
-| `addr(60)` | - | Returns zero address (no ETH mapping) |
-| `text("avatar")` | `avatar` | Direct mapping |
-| `text("contentHash")` | `contentHash` | Raw IPFS CID |
-| `text("walrusSiteId")` | `walrusSiteId` | Walrus site ID |
-| `text("org.suins.name")` | - | Returns original `.sui` name |
-| `contenthash()` | `contentHash` | Encoded as ENSIP-7 (0xe301 + CIDv1) |
+### 5. Query handler + precedence
+
+[`gateway/src/ccip-read/query.ts`](gateway/src/ccip-read/query.ts) resolves both sources in parallel, then [`gateway/src/ccip-read/precedence.ts`](gateway/src/ccip-read/precedence.ts) picks one value per query. `selectRecordValue` is pure and network-free — callers do the fetches first.
+
+#### Record precedence
+
+| ENS function | Value source | Notes |
+|--------------|--------------|-------|
+| `addr(784)` | SuiNS only | The canonical Sui address cannot be overridden. |
+| `addr(60)` / other coin types | Namespace | ENSIP-9 encoded; EVM L2 chain IDs remapped to ENSIP-11 coin types. |
+| `contenthash()` | SuiNS, fallback Namespace | Encoded as ENSIP-7 (`0xe301` + CIDv1 bytes). |
+| `text("avatar")` | SuiNS, fallback Namespace | SuiNS avatar: Sui NFT object → `display.image_url`. |
+| `text("contentHash" \| "walrusSiteId" \| "walrus")` | SuiNS only | Sui-native; Namespace cannot override. |
+| `text("org.suins.name")` | derived | The original `.sui` name, taken from the requested ENS name. |
+| `text(<any other key>)` | Namespace | Arbitrary text records the name holder added. |
 
 The contenthash encoding is tricky. SuiNS stores raw IPFS CIDs like `QmXxx` or `bafyxxx`. ENS expects ENSIP-7 format: `0xe301` (ipfs-ns namespace) followed by the CIDv1 bytes. We handle both CIDv0 and CIDv1 and convert to the right format.
+
+### 6. Demo app (Next.js)
+
+[`demo/`](demo/)
+
+A wallet-first UI on top of the bridge. The flow:
+
+1. A Sui wallet signs in via challenge/response — `api/auth/challenge` issues a nonce, the wallet signs it, `api/auth/verify` stores a session in Upstash Redis.
+2. Signed-in users see every SuiNS name the wallet holds (`api/names/list`).
+3. Each name links to a public profile at `/{name}` showing the ENS records resolvable at `{name}.onsui.eth` — read from SuiNS + Namespace.
+4. An inline edit drawer writes new records to Namespace (`api/records`). The first save creates the offchain record; browsing never pre-creates one.
+
+The demo is the only writer to Namespace (it holds `NAMESPACE_API_KEY`); the gateway reads Namespace without credentials.
 
 ## Security
 
@@ -128,7 +155,7 @@ You can run your own gateway with a different parent domain. Just deploy the con
 - Fast global edge network
 - Free tier is generous
 - Easy to deploy
-- No servers to manage
+- Managed by Cloudflare (no server ops)
 
 You could run this on any hosting platform. The logic is simple: decode calldata, query Sui, sign response, return JSON.
 
