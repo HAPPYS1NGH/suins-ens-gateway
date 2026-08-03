@@ -1,9 +1,9 @@
 "use client";
 
-import { ChainName, validateAddress } from "@thenamespace/offchain-manager";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ChainName, getCoinType, validateAddress } from "@thenamespace/offchain-manager";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-interface RecordProfile {
+export interface RecordProfile {
   fullName: string;
   addresses: Record<string, string>;
   texts: Record<string, string>;
@@ -13,6 +13,10 @@ interface RecordProfile {
 interface RecordEditorProps {
   /** The exact name this app just confirmed the session wallet owns. */
   suiName: string;
+  /** SuiNS avatar, if set. Hides the local "add avatar" text-record preset. */
+  suiAvatar?: string | null;
+  /** Fires whenever the loaded or saved profile changes. */
+  onProfileChange?: (profile: RecordProfile | null) => void;
 }
 
 type SaveStatus = "idle" | "pending" | "success" | "failure" | "unable-to-verify";
@@ -85,6 +89,27 @@ const OTHER_CHAINS = Object.values(ChainName)
 
 const ORDERED_CHAINS = [...POPULAR_CHAINS, ...OTHER_CHAINS];
 
+/**
+ * Namespace stores address records keyed by ENSIP-11/SLIP-44 coin type (e.g. "60"
+ * for Ethereum, "784" for Sui), but the editor works in ChainName values. Mirrors
+ * `chainNameFromAddressKey` in `lib/namespace/upsert.ts` so loaded rows hydrate with
+ * a chain `validateAddress` accepts — otherwise every saved address row would trip
+ * `hasRowErrors` and keep Save permanently disabled. Unknown coin types are dropped
+ * to match the server merge logic.
+ */
+const COIN_TO_CHAIN: Record<number, ChainName> = (() => {
+  const map: Record<number, ChainName> = {};
+  for (const chain of Object.values(ChainName)) {
+    map[getCoinType(chain)] = chain;
+  }
+  return map;
+})();
+
+function chainNameFromAddressKey(key: string): ChainName | undefined {
+  if ((Object.values(ChainName) as string[]).includes(key)) return key as ChainName;
+  return COIN_TO_CHAIN[Number(key)];
+}
+
 const TEXT_KEY_PRESETS: { label: string; key: string }[] = [
   { label: "Twitter / X", key: "com.twitter" },
   { label: "GitHub", key: "com.github" },
@@ -99,10 +124,6 @@ const TEXT_KEY_PRESETS: { label: string; key: string }[] = [
 const CUSTOM_KEY_VALUE = "__custom__";
 const RESERVED_TEXT_KEYS = new Set(["org.suins.name", "walrus", "walrusSiteId"]);
 const LEAVE_ANIMATION_MS = 150;
-
-function isPresetKey(key: string): boolean {
-  return TEXT_KEY_PRESETS.some((preset) => preset.key === key);
-}
 
 function addressRowError(row: Pick<AddressRow, "chain" | "value">): string | null {
   if (!row.value.trim()) return null;
@@ -132,7 +153,7 @@ function nextRowId(): number {
  * hard failure. Existing records load before the form becomes usable, and removals
  * of existing rows are sent explicitly so unrelated records remain untouched.
  */
-export function RecordEditor({ suiName }: RecordEditorProps) {
+export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEditorProps) {
   const [addresses, setAddresses] = useState<AddressRow[]>([]);
   const [texts, setTexts] = useState<TextRow[]>([]);
   const [removedChains, setRemovedChains] = useState<Set<string>>(new Set());
@@ -142,6 +163,19 @@ export function RecordEditor({ suiName }: RecordEditorProps) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [profile, setProfile] = useState<RecordProfile | null>(null);
+
+  const presets = useMemo(
+    () =>
+      suiAvatar
+        ? TEXT_KEY_PRESETS.filter((preset) => preset.key !== "avatar")
+        : TEXT_KEY_PRESETS,
+    [suiAvatar],
+  );
+
+  const isPresetKey = useCallback(
+    (key: string): boolean => presets.some((preset) => preset.key === key),
+    [presets],
+  );
   const loadSequence = useRef(0);
   const saveSequence = useRef(0);
   const currentSuiName = useRef(suiName);
@@ -149,14 +183,17 @@ export function RecordEditor({ suiName }: RecordEditorProps) {
 
   const hydrateProfile = useCallback((nextProfile: RecordProfile | null) => {
     setAddresses(
-      Object.entries(nextProfile?.addresses ?? {}).map(([chain, value]) => ({
-        id: nextRowId(),
-        chain: chain as ChainName,
-        value,
-        origin: "existing" as const,
-        originalChain: chain as ChainName,
-        leaving: false,
-      })),
+      Object.entries(nextProfile?.addresses ?? {})
+        .map(([key, value]) => ({ chain: chainNameFromAddressKey(key), value }))
+        .filter((row): row is { chain: ChainName; value: string } => Boolean(row.chain))
+        .map(({ chain, value }) => ({
+          id: nextRowId(),
+          chain,
+          value,
+          origin: "existing" as const,
+          originalChain: chain,
+          leaving: false,
+        })),
     );
     setTexts(
       Object.entries(nextProfile?.texts ?? {}).map(([key, value]) => ({
@@ -171,7 +208,7 @@ export function RecordEditor({ suiName }: RecordEditorProps) {
     );
     setRemovedChains(new Set());
     setRemovedTextKeys(new Set());
-  }, []);
+  }, [isPresetKey]);
 
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current;
@@ -183,6 +220,8 @@ export function RecordEditor({ suiName }: RecordEditorProps) {
       if (!response.ok) throw new Error(data.error ?? `Request failed with ${response.status}`);
       if (sequence !== loadSequence.current) return;
       const existing = data as RecordProfile | null;
+      setProfile(existing);
+      onProfileChange?.(existing);
       hydrateProfile(existing);
       setLoadStatus("ready");
     } catch (caught) {
@@ -190,7 +229,7 @@ export function RecordEditor({ suiName }: RecordEditorProps) {
       setLoadStatus("error");
       setLoadError(caught instanceof Error ? caught.message : "Could not load existing records");
     }
-  }, [hydrateProfile, suiName]);
+  }, [hydrateProfile, onProfileChange, suiName]);
 
   useEffect(() => {
     load();
@@ -201,7 +240,8 @@ export function RecordEditor({ suiName }: RecordEditorProps) {
     setSaveStatus("idle");
     setMessage(null);
     setProfile(null);
-  }, [suiName]);
+    onProfileChange?.(null);
+  }, [suiName, onProfileChange]);
 
   function addAddressRow() {
     setAddresses((rows) => [
@@ -299,6 +339,7 @@ export function RecordEditor({ suiName }: RecordEditorProps) {
       }
       const savedProfile = data as RecordProfile;
       setProfile(savedProfile);
+      onProfileChange?.(savedProfile);
       hydrateProfile(savedProfile);
       setSaveStatus("success");
     } catch (caught) {
@@ -387,7 +428,7 @@ export function RecordEditor({ suiName }: RecordEditorProps) {
                     aria-label="Text record type"
                   >
                     <option value="" disabled>Choose a record type...</option>
-                    {TEXT_KEY_PRESETS.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}
+                    {presets.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}
                     <option value={CUSTOM_KEY_VALUE}>Custom key...</option>
                   </select>
                   {row.customKey ? (

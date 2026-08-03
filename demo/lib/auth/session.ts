@@ -9,6 +9,8 @@ import {
   type Session,
 } from "./store";
 
+export type { Session };
+
 export const SESSION_COOKIE = "sui_demo_session";
 
 export async function startSession(suiAddress: string): Promise<Session> {

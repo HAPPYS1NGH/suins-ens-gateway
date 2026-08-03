@@ -2,7 +2,8 @@ import "server-only";
 
 import {
   SubnameAlreadyExistsError,
-  type ChainName,
+  ChainName,
+  getCoinType,
   type OffchainClient,
   type SubnameDTO,
 } from "@thenamespace/offchain-manager";
@@ -18,6 +19,25 @@ import { namespaceClient } from "./client";
 const PARENT_DOMAIN = "onsui.eth";
 const NAMESPACE_APP_ID = "sui-name-holder-demo";
 const NAMESPACE_SCHEMA_VERSION = "1";
+
+/**
+ * The Namespace API stores address records keyed by ENSIP-11/SLIP-44 coin type
+ * (e.g. "60" for Ethereum, "784" for Sui). The SDK accepts updates keyed by
+ * ChainName, so every read-back address must be translated from coin type back
+ * to ChainName before merging or re-submitting.
+ */
+const COIN_TO_CHAIN = (() => {
+  const map: Record<number, ChainName> = {};
+  for (const chain of Object.values(ChainName)) {
+    map[getCoinType(chain)] = chain;
+  }
+  return map;
+})();
+
+function chainNameFromAddressKey(key: string): ChainName | undefined {
+  if (Object.values(ChainName).includes(key as ChainName)) return key as ChainName;
+  return COIN_TO_CHAIN[Number(key)];
+}
 
 export interface UpsertInput {
   /** Name as entered by the user; re-verified against `suiAddress` before any write. */
@@ -126,7 +146,16 @@ function mergeAddressRecords(
   upserts: { chain: ChainName; value: string }[],
   removals: string[],
 ): { chain: ChainName; value: string }[] {
-  const merged: Record<string, string> = { ...current };
+  const merged: Record<string, string> = {};
+
+  // The API returns address keys as coin-type strings, but our update payload
+  // must use ChainName values. Translate anything we can, and drop unknown coin
+  // types rather than letting the SDK crash on getCoinType(undefined).
+  for (const [key, value] of Object.entries(current)) {
+    const chain = chainNameFromAddressKey(key);
+    if (chain) merged[chain] = value;
+  }
+
   for (const { chain, value } of upserts) merged[chain] = value;
   for (const chain of removals) delete merged[chain];
   return Object.entries(merged).map(([chain, value]) => ({ chain: chain as ChainName, value }));

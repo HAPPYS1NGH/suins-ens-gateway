@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecordEditor } from "@/components/record-editor";
@@ -68,6 +68,22 @@ describe("RecordEditor", () => {
     expect(screen.queryByLabelText(/contenthash/i)).toBeNull();
   });
 
+  it("shows the Avatar text-record preset by default", async () => {
+    render(<RecordEditor suiName="happy.sui" />);
+    await waitForLoaded();
+    fireEvent.click(screen.getByText("+ Add text record"));
+    const select = screen.getByLabelText("Text record type");
+    expect(within(select).getByText("Avatar")).toBeTruthy();
+  });
+
+  it("hides the Avatar text-record preset when the SuiNS name already has an avatar", async () => {
+    render(<RecordEditor suiName="happy.sui" suiAvatar="https://example.com/avatar.png" />);
+    await waitForLoaded();
+    fireEvent.click(screen.getByText("+ Add text record"));
+    const select = screen.getByLabelText("Text record type");
+    expect(within(select).queryByText("Avatar")).toBeNull();
+  });
+
   it("gives every address row an accessible chain selector and value field", async () => {
     render(<RecordEditor suiName="happy.sui" />);
     await waitForLoaded();
@@ -126,6 +142,57 @@ describe("RecordEditor", () => {
     // "com.example" has no preset, so it renders in custom-key mode with the
     // technical key visible for editing.
     expect(screen.getByDisplayValue("com.example")).toBeTruthy();
+  });
+
+  it("hydrates coin-type-keyed addresses (the real API shape) as ChainName rows so Save stays enabled", async () => {
+    // The Namespace API stores address records keyed by SLIP-44 coin type ("60" =
+    // Ethereum), not by ChainName. A loaded ETH row must translate to chain "eth"
+    // so validateAddress accepts it; otherwise hasRowErrors keeps Save disabled.
+    stubRecordsFetch({
+      profile: {
+        fullName: "happy.onsui.eth",
+        addresses: { "60": ETH_ADDRESS },
+        texts: {},
+        contenthash: null,
+      },
+    });
+
+    render(<RecordEditor suiName="happy.sui" />);
+    await waitForLoaded();
+
+    expect(screen.getByLabelText("eth address")).toBeTruthy();
+    expect((screen.getByText("Save") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("sends a ChainName removal for a coin-type-keyed existing row", async () => {
+    stubRecordsFetch({
+      profile: {
+        fullName: "happy.onsui.eth",
+        addresses: { "60": ETH_ADDRESS },
+        texts: {},
+        contenthash: null,
+      },
+    });
+
+    render(<RecordEditor suiName="happy.sui" />);
+    await waitForLoaded();
+
+    let savedBody: Record<string, unknown> | null = null;
+    stubRecordsFetch({
+      profile: EMPTY_PROFILE,
+      onSave: (body) => {
+        savedBody = body;
+        return {};
+      },
+    });
+
+    fireEvent.click(screen.getByText("Remove"));
+    fireEvent.click(screen.getByText("Save"));
+
+    await waitFor(() => expect(savedBody).not.toBeNull());
+    expect((savedBody as unknown as { removeAddresses: string[] }).removeAddresses).toEqual([
+      "eth",
+    ]);
   });
 
   it("disables Save until the initial profile load resolves", async () => {
