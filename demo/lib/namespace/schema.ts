@@ -1,6 +1,8 @@
 import { ChainName, validateAddress } from "@thenamespace/offchain-manager";
 import { z } from "zod";
 
+import { RESERVED_CHAINS, RESERVED_TEXT_KEYS } from "@/lib/records";
+
 const MAX_ADDRESS_RECORDS = 20;
 const MAX_TEXT_RECORDS = 30;
 const MAX_TEXT_VALUE_LENGTH = 512;
@@ -8,19 +10,16 @@ const MAX_CONTENTHASH_LENGTH = 512;
 
 const SUPPORTED_CHAINS = new Set<string>(Object.values(ChainName));
 
-/**
- * Keys the gateway always serves from SuiNS regardless of what Namespace holds
- * (`gateway/src/ccip-read/precedence.ts`). Accepting them here would let a holder
- * write a value the gateway would silently ignore, so the boundary rejects them
- * outright instead of misleading the caller with an apparently successful save.
- */
-const RESERVED_TEXT_KEYS = new Set(["org.suins.name", "walrus", "walrusSiteId"]);
-
 export const multichainAddressSchema = z
   .object({
-    chain: z.string().refine((value) => SUPPORTED_CHAINS.has(value), {
-      message: "Unsupported chain",
-    }),
+    chain: z
+      .string()
+      .refine((value) => SUPPORTED_CHAINS.has(value), { message: "Unsupported chain" })
+      // The gateway serves addr(784) from SuiNS alone, so a Sui address written here
+      // could never be resolved — reject it instead of appearing to save it.
+      .refine((value) => !RESERVED_CHAINS.has(value), {
+        message: "The Sui address comes from SuiNS and cannot be set here",
+      }),
     value: z.string().min(1).max(256),
   })
   .strict()

@@ -10,8 +10,6 @@ const envSchema = z.object({
   /** Overrides the public fullnode gRPC endpoint derived from SUI_NETWORK. */
   SUI_RPC_URL: z.url().optional(),
   NAMESPACE_API_KEY: z.string().min(1),
-  /** Mainnet Ethereum RPC for CCIP-Read ENS preview; viem's public default is rate-limited. */
-  MAINNET_RPC_URL: z.url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

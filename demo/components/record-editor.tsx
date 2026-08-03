@@ -1,7 +1,16 @@
 "use client";
 
-import { ChainName, getCoinType, validateAddress } from "@thenamespace/offchain-manager";
+import { ChainName, validateAddress } from "@thenamespace/offchain-manager";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import {
+  CHAIN_LABELS,
+  ORDERED_CHAINS,
+  RESERVED_CHAINS,
+  RESERVED_TEXT_KEYS,
+  TEXT_KEY_PRESETS,
+  chainNameFromAddressKey,
+} from "@/lib/records";
 
 export interface RecordProfile {
   fullName: string;
@@ -17,6 +26,10 @@ interface RecordEditorProps {
   suiAvatar?: string | null;
   /** Fires whenever the loaded or saved profile changes. */
   onProfileChange?: (profile: RecordProfile | null) => void;
+  /** True while a save is in flight, so a host drawer can refuse to close mid-write. */
+  onBusyChange?: (busy: boolean) => void;
+  /** Fires only after a save the server accepted. */
+  onSaved?: (profile: RecordProfile) => void;
 }
 
 type SaveStatus = "idle" | "pending" | "success" | "failure" | "unable-to-verify";
@@ -42,90 +55,37 @@ interface TextRow {
   leaving: boolean;
 }
 
-const CHAIN_LABELS: Record<ChainName, string> = {
-  [ChainName.Ethereum]: "Ethereum",
-  [ChainName.Default]: "Default",
-  [ChainName.Solana]: "Solana",
-  [ChainName.Arbitrum]: "Arbitrum",
-  [ChainName.Optimism]: "Optimism",
-  [ChainName.Base]: "Base",
-  [ChainName.Polygon]: "Polygon",
-  [ChainName.Bsc]: "BNB Chain",
-  [ChainName.Avalanche]: "Avalanche",
-  [ChainName.Gnosis]: "Gnosis",
-  [ChainName.Zksync]: "zkSync",
-  [ChainName.Cosmos]: "Cosmos",
-  [ChainName.Near]: "NEAR",
-  [ChainName.Linea]: "Linea",
-  [ChainName.Scroll]: "Scroll",
-  [ChainName.Bitcoin]: "Bitcoin",
-  [ChainName.Starknet]: "Starknet",
-  [ChainName.Sui]: "Sui",
-  [ChainName.Unichain]: "Unichain",
-  [ChainName.Berachain]: "Berachain",
-  [ChainName.WorldChain]: "World Chain",
-  [ChainName.Zora]: "Zora",
-  [ChainName.Celo]: "Celo",
-  [ChainName.Aptos]: "Aptos",
-  [ChainName.Algorand]: "Algorand",
-  [ChainName.Monad]: "Monad",
-  [ChainName.Push]: "Push",
-  [ChainName.Polkadot]: "Polkadot",
-  [ChainName.Vara]: "Vara",
-};
-
-const POPULAR_CHAINS: ChainName[] = [
-  ChainName.Ethereum,
-  ChainName.Solana,
-  ChainName.Bitcoin,
-  ChainName.Base,
-  ChainName.Polygon,
-  ChainName.Arbitrum,
-];
-
-const OTHER_CHAINS = Object.values(ChainName)
-  .filter((chain) => !POPULAR_CHAINS.includes(chain))
-  .sort((a, b) => CHAIN_LABELS[a].localeCompare(CHAIN_LABELS[b]));
-
-const ORDERED_CHAINS = [...POPULAR_CHAINS, ...OTHER_CHAINS];
-
-/**
- * Namespace stores address records keyed by ENSIP-11/SLIP-44 coin type (e.g. "60"
- * for Ethereum, "784" for Sui), but the editor works in ChainName values. Mirrors
- * `chainNameFromAddressKey` in `lib/namespace/upsert.ts` so loaded rows hydrate with
- * a chain `validateAddress` accepts — otherwise every saved address row would trip
- * `hasRowErrors` and keep Save permanently disabled. Unknown coin types are dropped
- * to match the server merge logic.
- */
-const COIN_TO_CHAIN: Record<number, ChainName> = (() => {
-  const map: Record<number, ChainName> = {};
-  for (const chain of Object.values(ChainName)) {
-    map[getCoinType(chain)] = chain;
-  }
-  return map;
-})();
-
-function chainNameFromAddressKey(key: string): ChainName | undefined {
-  if ((Object.values(ChainName) as string[]).includes(key)) return key as ChainName;
-  return COIN_TO_CHAIN[Number(key)];
-}
-
-const TEXT_KEY_PRESETS: { label: string; key: string }[] = [
-  { label: "Twitter / X", key: "com.twitter" },
-  { label: "GitHub", key: "com.github" },
-  { label: "Discord", key: "com.discord" },
-  { label: "Telegram", key: "org.telegram" },
-  { label: "Website", key: "url" },
-  { label: "Email", key: "email" },
-  { label: "Avatar", key: "avatar" },
-  { label: "Description", key: "description" },
-];
-
 const CUSTOM_KEY_VALUE = "__custom__";
-const RESERVED_TEXT_KEYS = new Set(["org.suins.name", "walrus", "walrusSiteId"]);
 const LEAVE_ANIMATION_MS = 150;
 
-function addressRowError(row: Pick<AddressRow, "chain" | "value">): string | null {
+/**
+ * A record is keyed by its chain (or text key), so two rows sharing one would race to
+ * define it and the merge would silently keep whichever landed last. Both validators
+ * take the sibling rows and reject the duplicate up front, which covers every way one
+ * can appear: adding a second row, retyping a custom key, or switching an existing
+ * row onto a key another row already holds.
+ */
+function isDuplicate<T extends { id: number; leaving: boolean }>(
+  row: T,
+  rows: T[],
+  keyOf: (row: T) => string,
+): boolean {
+  const key = keyOf(row);
+  // Only the later row is flagged. Marking both would blame the record the holder
+  // already had for a collision the new one caused.
+  return rows.some(
+    (other) =>
+      other.id !== row.id &&
+      !other.leaving &&
+      other.id < row.id &&
+      keyOf(other) === key,
+  );
+}
+
+function addressRowError(row: AddressRow, rows: AddressRow[] = []): string | null {
+  if (isDuplicate(row, rows, (candidate) => candidate.chain)) {
+    return `${CHAIN_LABELS[row.chain]} already has an address`;
+  }
   if (!row.value.trim()) return null;
   try {
     validateAddress(row.value.trim(), row.chain);
@@ -135,11 +95,16 @@ function addressRowError(row: Pick<AddressRow, "chain" | "value">): string | nul
   }
 }
 
-function textRowError(row: Pick<TextRow, "key">): string | null {
-  if (!row.key.trim()) return null;
-  return RESERVED_TEXT_KEYS.has(row.key.trim())
-    ? "This key is reserved for Sui-native data"
-    : null;
+function textRowError(row: TextRow, rows: TextRow[] = []): string | null {
+  const key = row.key.trim();
+  if (!key) return null;
+  if (RESERVED_TEXT_KEYS.has(key)) {
+    return "This key is reserved for Sui-native data";
+  }
+  if (isDuplicate(row, rows, (candidate) => candidate.key.trim())) {
+    return `${key} is already set`;
+  }
+  return null;
 }
 
 let rowId = 0;
@@ -153,7 +118,13 @@ function nextRowId(): number {
  * hard failure. Existing records load before the form becomes usable, and removals
  * of existing rows are sent explicitly so unrelated records remain untouched.
  */
-export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEditorProps) {
+export function RecordEditor({
+  suiName,
+  suiAvatar,
+  onProfileChange,
+  onBusyChange,
+  onSaved,
+}: RecordEditorProps) {
   const [addresses, setAddresses] = useState<AddressRow[]>([]);
   const [texts, setTexts] = useState<TextRow[]>([]);
   const [removedChains, setRemovedChains] = useState<Set<string>>(new Set());
@@ -185,7 +156,11 @@ export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEdit
     setAddresses(
       Object.entries(nextProfile?.addresses ?? {})
         .map(([key, value]) => ({ chain: chainNameFromAddressKey(key), value }))
-        .filter((row): row is { chain: ChainName; value: string } => Boolean(row.chain))
+        // Unknown coin types, and any chain the gateway serves from SuiNS instead,
+        // are not editable here — a legacy 784 record must not resurface as a row.
+        .filter((row): row is { chain: ChainName; value: string } =>
+          Boolean(row.chain) && !RESERVED_CHAINS.has(row.chain!),
+        )
         .map(({ chain, value }) => ({
           id: nextRowId(),
           chain,
@@ -244,10 +219,15 @@ export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEdit
   }, [suiName, onProfileChange]);
 
   function addAddressRow() {
-    setAddresses((rows) => [
-      ...rows,
-      { id: nextRowId(), chain: ChainName.Ethereum, value: "", origin: "new", originalChain: null, leaving: false },
-    ]);
+    setAddresses((rows) => {
+      const taken = new Set(rows.filter((row) => !row.leaving).map((row) => row.chain));
+      const chain = ORDERED_CHAINS.find((candidate) => !taken.has(candidate));
+      if (!chain) return rows;
+      return [
+        ...rows,
+        { id: nextRowId(), chain, value: "", origin: "new", originalChain: null, leaving: false },
+      ];
+    });
   }
 
   function removeAddressRow(id: number) {
@@ -282,9 +262,14 @@ export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEdit
   }
 
   const hasRowErrors =
-    addresses.some((row) => !row.leaving && addressRowError(row)) ||
-    texts.some((row) => !row.leaving && textRowError(row));
+    addresses.some((row) => !row.leaving && addressRowError(row, addresses)) ||
+    texts.some((row) => !row.leaving && textRowError(row, texts));
   const hasRecords = addresses.some((row) => !row.leaving) || texts.some((row) => !row.leaving);
+  const usedChains = new Set(addresses.filter((row) => !row.leaving).map((row) => row.chain));
+  const usedTextKeys = new Set(
+    texts.filter((row) => !row.leaving).map((row) => row.key.trim()),
+  );
+  const allChainsUsed = usedChains.size >= ORDERED_CHAINS.length;
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -342,6 +327,7 @@ export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEdit
       onProfileChange?.(savedProfile);
       hydrateProfile(savedProfile);
       setSaveStatus("success");
+      onSaved?.(savedProfile);
     } catch (caught) {
       if (!isCurrentSave()) return;
       setSaveStatus("failure");
@@ -352,15 +338,15 @@ export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEdit
   const pending = saveStatus === "pending";
   const retrying = saveStatus === "unable-to-verify";
 
+  useEffect(() => {
+    onBusyChange?.(pending);
+  }, [pending, onBusyChange]);
+
   return (
     <section className="panel" aria-labelledby="records-title">
-      <h2 className="panel-title" id="records-title">Records</h2>
-      <p className="mono muted">
-        Saved to <span className="mono">{suiName}</span> on label.onsui.eth through Namespace.
-        Ownership is rechecked on every save.
-      </p>
+      <h2 className="sr-only" id="records-title">Records</h2>
 
-      {loadStatus === "loading" ? <p className="mono muted">Loading your saved records...</p> : null}
+      {loadStatus === "loading" ? <p className="mono muted">Loading records…</p> : null}
       {loadStatus === "error" ? (
         <div className="error" role="alert">
           <p>{loadError}</p>
@@ -372,10 +358,10 @@ export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEdit
         <fieldset className="field" disabled={loadStatus !== "ready" || pending}>
           <legend className="field-label">Addresses</legend>
           {!hasRecords && loadStatus === "ready" ? (
-            <p className="mono muted">No records yet - add your first one below.</p>
+            <p className="mono muted">No records yet.</p>
           ) : null}
           {addresses.map((row) => {
-            const rowError = addressRowError(row);
+            const rowError = addressRowError(row, addresses);
             return (
               <div key={row.id} className={row.leaving ? "record-row record-row-leaving" : "record-row"}>
                 <div className="btn-row">
@@ -386,7 +372,15 @@ export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEdit
                     onChange={(event) => updateAddressRow(row.id, { chain: event.target.value as ChainName })}
                     aria-label="Chain"
                   >
-                    {ORDERED_CHAINS.map((chain) => <option key={chain} value={chain}>{CHAIN_LABELS[chain]}</option>)}
+                    {ORDERED_CHAINS.map((chain) => (
+                      <option
+                        key={chain}
+                        value={chain}
+                        disabled={chain !== row.chain && usedChains.has(chain)}
+                      >
+                        {CHAIN_LABELS[chain]}
+                      </option>
+                    ))}
                   </select>
                   <input
                     className="input mono"
@@ -405,13 +399,20 @@ export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEdit
               </div>
             );
           })}
-          <button type="button" className="btn-secondary" onClick={addAddressRow}>+ Add address</button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={addAddressRow}
+            disabled={allChainsUsed}
+          >
+            + Add address
+          </button>
         </fieldset>
 
         <fieldset className="field" disabled={loadStatus !== "ready" || pending}>
           <legend className="field-label">Text records</legend>
           {texts.map((row) => {
-            const rowError = textRowError(row);
+            const rowError = textRowError(row, texts);
             return (
               <div key={row.id} className={row.leaving ? "record-row record-row-leaving" : "record-row"}>
                 <div className="btn-row">
@@ -428,7 +429,15 @@ export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEdit
                     aria-label="Text record type"
                   >
                     <option value="" disabled>Choose a record type...</option>
-                    {presets.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}
+                    {presets.map((preset) => (
+                      <option
+                        key={preset.key}
+                        value={preset.key}
+                        disabled={preset.key !== row.key && usedTextKeys.has(preset.key)}
+                      >
+                        {preset.label}
+                      </option>
+                    ))}
                     <option value={CUSTOM_KEY_VALUE}>Custom key...</option>
                   </select>
                   {row.customKey ? (
@@ -437,7 +446,7 @@ export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEdit
                       style={{ maxWidth: 180 }}
                       value={row.key}
                       onChange={(event) => updateTextRow(row.id, { key: event.target.value })}
-                      placeholder="e.g. com.example"
+                      placeholder="Custom key"
                       autoComplete="off"
                       spellCheck={false}
                       aria-label="Custom record key"
@@ -455,7 +464,6 @@ export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEdit
                   />
                   <button type="button" className="btn-secondary" onClick={() => removeTextRow(row.id)}>Remove</button>
                 </div>
-                {!row.customKey && row.key ? <p className="mono muted">{row.key}</p> : null}
                 {rowError ? <p className="mono muted" role="alert" id={`text-error-${row.id}`}>{rowError}</p> : null}
               </div>
             );
@@ -471,18 +479,7 @@ export function RecordEditor({ suiName, suiAvatar, onProfileChange }: RecordEdit
       </form>
 
       <div aria-live="polite">
-        {saveStatus === "success" && profile ? (
-          <>
-            <span className="chip chip-ok">saved</span>
-            <p className="mono">{profile.fullName}</p>
-            {Object.entries(profile.addresses).map(([chain, value]) => (
-              <p className="mono muted" key={chain}>{CHAIN_LABELS[chain as ChainName] ?? chain}: {value}</p>
-            ))}
-            {Object.entries(profile.texts).map(([key, value]) => (
-              <p className="mono muted" key={key}>{key}: {value}</p>
-            ))}
-          </>
-        ) : null}
+        {saveStatus === "success" ? <span className="chip chip-ok">saved</span> : null}
       </div>
 
       {retrying || saveStatus === "failure" ? <p className="error" role="alert">{message}</p> : null}

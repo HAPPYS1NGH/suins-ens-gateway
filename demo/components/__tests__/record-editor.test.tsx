@@ -402,4 +402,79 @@ describe("RecordEditor", () => {
     expect(screen.queryByDisplayValue("stale-save")).toBeNull();
     expect(screen.queryByText("saved")).toBeNull();
   });
+
+  it("refuses a second address row for a chain that already has one", async () => {
+    stubRecordsFetch({
+      profile: { ...EMPTY_PROFILE, addresses: { "60": ETH_ADDRESS } },
+    });
+    render(<RecordEditor suiName="happy.sui" />);
+    await waitForLoaded();
+
+    // A new row opens on the first free chain, so it cannot clash on arrival.
+    fireEvent.click(screen.getByText("+ Add address"));
+    const selectors = screen.getAllByLabelText("Chain") as HTMLSelectElement[];
+    expect(selectors).toHaveLength(2);
+    expect(selectors[1].value).not.toBe(selectors[0].value);
+
+    // Forcing it onto the taken chain surfaces an error and blocks the save, rather
+    // than letting two rows race to define one record.
+    fireEvent.change(selectors[1], { target: { value: selectors[0].value } });
+
+    // Only the offending row is flagged; the record already saved stays clean.
+    expect(await screen.findAllByText(/already has an address/)).toHaveLength(1);
+    await waitFor(() =>
+      expect((screen.getByText("Save") as HTMLButtonElement).disabled).toBe(true),
+    );
+  });
+
+  it("marks a chain already in use as unselectable", async () => {
+    stubRecordsFetch({
+      profile: { ...EMPTY_PROFILE, addresses: { "60": ETH_ADDRESS } },
+    });
+    render(<RecordEditor suiName="happy.sui" />);
+    await waitForLoaded();
+
+    fireEvent.click(screen.getByText("+ Add address"));
+    const selectors = screen.getAllByLabelText("Chain") as HTMLSelectElement[];
+    const taken = within(selectors[1]).getByRole("option", {
+      name: "Ethereum",
+    }) as HTMLOptionElement;
+
+    expect(taken.disabled).toBe(true);
+  });
+
+  it("refuses a second text row for a key that already has one", async () => {
+    stubRecordsFetch({
+      profile: { ...EMPTY_PROFILE, texts: { "com.discord": "alice#1" } },
+    });
+    render(<RecordEditor suiName="happy.sui" />);
+    await waitForLoaded();
+
+    fireEvent.click(screen.getByText("+ Add text record"));
+    const selectors = screen.getAllByLabelText("Text record type") as HTMLSelectElement[];
+    fireEvent.change(selectors[1], { target: { value: "com.discord" } });
+
+    expect(await screen.findAllByText(/com\.discord is already set/)).toHaveLength(1);
+    await waitFor(() =>
+      expect((screen.getByText("Save") as HTMLButtonElement).disabled).toBe(true),
+    );
+  });
+
+  it("refuses a custom key that duplicates an existing record", async () => {
+    stubRecordsFetch({
+      profile: { ...EMPTY_PROFILE, texts: { "com.discord": "alice#1" } },
+    });
+    render(<RecordEditor suiName="happy.sui" />);
+    await waitForLoaded();
+
+    fireEvent.click(screen.getByText("+ Add text record"));
+    const selectors = screen.getAllByLabelText("Text record type") as HTMLSelectElement[];
+    fireEvent.change(selectors[1], { target: { value: "__custom__" } });
+    fireEvent.change(screen.getByLabelText("Custom record key"), {
+      target: { value: "com.discord" },
+    });
+
+    // The dropdown is not the only way in — a typed key must hit the same rule.
+    expect(await screen.findAllByText(/com\.discord is already set/)).toHaveLength(1);
+  });
 });

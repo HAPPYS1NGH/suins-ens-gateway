@@ -486,47 +486,28 @@ h3,
 
 /* ---------- Profile card ---------- */
 .pcard {
+  position: relative;
   width: 100%;
   max-width: 960px;
   margin: 0 auto;
+  padding: var(--s-4);
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
-  overflow: hidden;
-}
-
-.pcard__cover {
-  position: relative;
-  height: 200px;
-  background: linear-gradient(120deg, #0f1430 0%, #1a2350 50%, #0b1028 100%);
-}
-.pcard__cover-motif {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(50% 60% at 80% 20%, rgba(77, 162, 255, 0.25) 0%, transparent 70%),
-    radial-gradient(40% 50% at 10% 90%, rgba(77, 162, 255, 0.12) 0%, transparent 70%);
-}
-
-.pcard__body {
-  padding: 16px 32px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-3);
 }
 
 .pcard__identity {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 20px;
   flex-wrap: wrap;
 }
 
 .pcard__avatar {
-  margin-top: -64px;
+  position: relative;
   flex: none;
-  width: 112px;
-  height: 112px;
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
   border: 5px solid var(--surface-2);
   overflow: hidden;
@@ -538,6 +519,26 @@ h3,
   width: 100%;
   height: 100%;
   display: block;
+}
+/* SuiNS avatar overlays the pixel fallback, so the holder's set image wins
+   while the pixel avatar still fills the ring when none is set. */
+.pcard__avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: avatar-in 280ms var(--ease-out);
+}
+@keyframes avatar-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .pcard__idmeta {
@@ -639,13 +640,19 @@ h3,
   text-decoration: none;
   font-size: 0.75rem;
   font-weight: 700;
+  animation: prec-in 260ms var(--ease-out) backwards;
+  animation-delay: calc(min(var(--prec-i, 0), 10) * 36ms);
   transition:
     border-color 150ms var(--ease-out),
-    color 150ms var(--ease-out);
+    color 150ms var(--ease-out),
+    background 150ms var(--ease-out),
+    transform 150ms var(--ease-out);
 }
 .pcard__social:hover {
   border-color: var(--primary-soft);
   color: var(--primary);
+  background: var(--surface-1);
+  transform: translateY(-2px);
 }
 
 /* ---------- Name grid ---------- */
@@ -666,6 +673,7 @@ h3,
   border-radius: var(--r-md);
   color: var(--text-primary);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
   transition:
     border-color 200ms var(--ease-out),
@@ -673,15 +681,10 @@ h3,
     background 200ms var(--ease-out);
 }
 
-.name-card:hover:not(:disabled) {
+.name-card:hover {
   border-color: var(--primary-soft);
   background: var(--surface-1);
   transform: translateY(-2px);
-}
-
-.name-card:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .name-card__avatar,
@@ -1010,59 +1013,6 @@ select.input {
   }
 }
 
-.record-header {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-bottom: 8px;
-}
-
-.record-header__avatar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.record-header__avatar img,
-.record-header__avatar svg {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-}
-
-.record-header__name {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.record-header__addresses {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.record-header__address {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  background: var(--surface-3);
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  font-size: 0.75rem;
-}
-
-/* ---------- Resolution preview rows ---------- */
-.preview-row {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.preview-row:last-child {
-  border-bottom: none;
-}
-
 /* ---------- Copy button ---------- */
 .copy-btn {
   display: inline-flex;
@@ -1175,6 +1125,323 @@ select.input {
   }
 }
 
+
+/* ---------- Profile: edit affordance + address pills ---------- */
+.pcard__edit {
+  position: absolute;
+  top: var(--s-3);
+  right: var(--s-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-pill);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out);
+}
+
+.pcard__edit:hover {
+  background: var(--surface-1);
+  border-color: var(--accent);
+}
+
+.pcard__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pcard__pill-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-hint);
+}
+
+/* ---------- Record sections ---------- */
+.psection {
+  width: 100%;
+  max-width: 960px;
+  margin: var(--s-3) auto 0;
+  padding: var(--s-3) var(--s-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+
+.psection__title {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-emphasized);
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.psection__note {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.precords {
+  margin-top: var(--s-2);
+}
+
+/*
+ * Rows fade in on a per-row delay driven by `--prec-i`, so a section reads as one
+ * list arriving rather than a block appearing. Capped so a long list never stalls.
+ */
+.paddr {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  animation: prec-in 260ms var(--ease-out) backwards;
+  animation-delay: calc(min(var(--prec-i, 0), 12) * 28ms);
+}
+
+.paddr:last-child {
+  border-bottom: none;
+}
+
+@keyframes prec-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.paddr__value--empty {
+  color: var(--text-hint);
+  font-size: 0.875rem;
+}
+
+.chainmark {
+  flex: none;
+  border-radius: 50%;
+}
+
+.chainmark--mono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  /* Brand tiles vary in luminance; a hairline keeps the pale ones off the surface. */
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+/* An unset chain stays discoverable but recedes behind the ones that resolve. */
+.paddr--empty .chainmark {
+  opacity: 0.34;
+  filter: saturate(0.4);
+}
+
+.paddr--empty:hover .chainmark {
+  opacity: 0.7;
+  filter: none;
+}
+
+.paddr__chain {
+  flex: 0 0 108px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.paddr__value {
+  min-width: 0;
+  flex: 1;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Edit drawer ---------- */
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.drawer__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 3, 12, 0.62);
+  backdrop-filter: blur(2px);
+  animation: drawer-scrim-in 200ms var(--ease-out);
+}
+
+.drawer__panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  height: 100%;
+  background: var(--surface-2);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -24px 0 64px rgba(0, 0, 0, 0.5);
+  animation: drawer-in 280ms var(--ease-out);
+}
+
+@keyframes drawer-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.drawer__title {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-emphasized);
+}
+
+.drawer__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.drawer__close:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.drawer__close:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s-3);
+}
+
+/* The editor supplies its own chrome elsewhere; inside the drawer it is the content. */
+.drawer__body .panel {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+@media (max-width: 640px) {
+  .paddr__chain {
+    flex: 1;
+  }
+}
+
+
+/* ---------- Text records as chips ---------- */
+.pcard__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.chip-rec {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 7px 13px 7px 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  text-decoration: none;
+  animation: prec-in 300ms var(--ease-out) backwards;
+  animation-delay: calc(min(var(--prec-i, 0), 10) * 40ms);
+  transition:
+    border-color 180ms var(--ease-out),
+    background 180ms var(--ease-out),
+    transform 180ms var(--ease-out),
+    color 180ms var(--ease-out);
+}
+
+.chip-rec__icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-hint);
+  transition: color 180ms var(--ease-out);
+}
+
+.chip-rec__value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-rec--link:hover {
+  background: var(--surface-1);
+  border-color: var(--accent);
+  color: var(--text-emphasized);
+  transform: translateY(-1px);
+}
+
+.chip-rec--link:hover .chip-rec__icon {
+  color: var(--accent);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.001ms !important;
@@ -1184,8 +1451,16 @@ select.input {
   }
 
   .btn:hover:not(:disabled),
-  .name-card:hover:not(:disabled) {
+  .name-card:hover {
     transform: none;
     box-shadow: none;
+  }
+
+  .drawer__panel {
+    animation: none;
+  }
+
+  .chip-rec--link:hover {
+    transform: none;
   }
 }

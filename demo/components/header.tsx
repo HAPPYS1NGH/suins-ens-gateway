@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { toMessageBytes } from "@/lib/auth/message";
 import type { Session } from "@/lib/auth/session";
+import { truncateAddr } from "@/lib/records";
 
 interface HeaderProps {
   session: Session | null;
@@ -49,10 +50,6 @@ async function postJson(
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong";
-}
-
-function truncateAddr(address: string): string {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
 function WalletMenu({ session }: HeaderProps) {

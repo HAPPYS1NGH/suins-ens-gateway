@@ -48,7 +48,16 @@ describe("ensRecordSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it.each(["org.suins.name", "walrus", "walrusSiteId"])(
+  it("rejects a Sui address record — addr(784) is served from SuiNS alone", () => {
+    const result = ensRecordSchema.safeParse({
+      suiName: "happy.sui",
+      addresses: [{ chain: "sui", value: `0x${"1".repeat(64)}` }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it.each(["org.suins.name", "contentHash", "walrus", "walrusSiteId"])(
     "rejects the reserved text key %s",
     (key) => {
       const result = ensRecordSchema.safeParse({

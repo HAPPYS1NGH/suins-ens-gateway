@@ -3,7 +3,6 @@ import "server-only";
 import {
   SubnameAlreadyExistsError,
   ChainName,
-  getCoinType,
   type OffchainClient,
   type SubnameDTO,
 } from "@thenamespace/offchain-manager";
@@ -12,32 +11,13 @@ import { getAddress } from "viem";
 
 import { env } from "@/lib/env";
 import type { MultichainAddressInput, TextRecordInput } from "@/lib/namespace/schema";
+import { chainNameFromAddressKey, PARENT_DOMAIN } from "@/lib/records";
 import { checkNameOwnership, type NameOwnershipStatus } from "@/lib/suins/ownership";
 
 import { namespaceClient } from "./client";
 
-const PARENT_DOMAIN = "onsui.eth";
 const NAMESPACE_APP_ID = "sui-name-holder-demo";
 const NAMESPACE_SCHEMA_VERSION = "1";
-
-/**
- * The Namespace API stores address records keyed by ENSIP-11/SLIP-44 coin type
- * (e.g. "60" for Ethereum, "784" for Sui). The SDK accepts updates keyed by
- * ChainName, so every read-back address must be translated from coin type back
- * to ChainName before merging or re-submitting.
- */
-const COIN_TO_CHAIN = (() => {
-  const map: Record<number, ChainName> = {};
-  for (const chain of Object.values(ChainName)) {
-    map[getCoinType(chain)] = chain;
-  }
-  return map;
-})();
-
-function chainNameFromAddressKey(key: string): ChainName | undefined {
-  if (Object.values(ChainName).includes(key as ChainName)) return key as ChainName;
-  return COIN_TO_CHAIN[Number(key)];
-}
 
 export interface UpsertInput {
   /** Name as entered by the user; re-verified against `suiAddress` before any write. */

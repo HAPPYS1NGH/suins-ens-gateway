@@ -31,14 +31,13 @@ async function profileFor(rawSuiName: string) {
   return readProfile(toEnsFullName(normalizedName));
 }
 
-/** The current public projection for a name. Read-only; ownership is not required. */
+/**
+ * The current public projection for a name. Read-only and unauthenticated: it returns
+ * exactly what `/[name]` already renders to anyone, so requiring a session here would
+ * only stop the editor from re-reading its own records.
+ */
 export async function GET(request: Request): Promise<Response> {
   try {
-    const session = await getCurrentSession();
-    if (!session) {
-      throw new RequestRejected("Sign in with a Sui wallet first", 401);
-    }
-
     const query = querySchema.safeParse({
       name: new URL(request.url).searchParams.get("name"),
     });

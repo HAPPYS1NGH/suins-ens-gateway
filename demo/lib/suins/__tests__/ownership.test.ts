@@ -13,7 +13,7 @@ vi.mock("../client", () => ({
   }),
 }));
 
-const { checkNameOwnership } = await import("../ownership");
+const { checkNameOwnership, resolveNameOwner } = await import("../ownership");
 
 const HOLDER = normalizeSuiAddress("0x1");
 const STRANGER = normalizeSuiAddress("0x2");
@@ -142,5 +142,51 @@ describe("checkNameOwnership", () => {
     const result = await checkNameOwnership("happy.sui", HOLDER);
 
     expect(result.status).toBe("rpc-unavailable");
+  });
+});
+
+describe("resolveNameOwner", () => {
+  it("returns the holder of a name the caller does not own", async () => {
+    getNameRecord.mockResolvedValue(record());
+    getObject.mockResolvedValue(ownedBy(STRANGER));
+
+    const result = await resolveNameOwner("happy.sui");
+
+    // The public profile path has no candidate address, so a stranger's name still
+    // resolves to `owned` rather than the mismatch `checkNameOwnership` would report.
+    expect(result.status).toBe("owned");
+    expect(result).toMatchObject({ ownerAddress: STRANGER, normalizedName: "happy.sui" });
+  });
+
+  it("reports an unreachable RPC rather than a missing name", async () => {
+    getNameRecord.mockRejectedValue(new Error("connect ECONNREFUSED"));
+
+    expect((await resolveNameOwner("happy.sui")).status).toBe("rpc-unavailable");
+  });
+
+  it("treats the SDK's thrown 'Object not found' as an unregistered name", async () => {
+    // The registry lookup throws instead of returning null when nobody registered the
+    // name. Reporting that as `rpc-unavailable` claimed Sui was down for every typo,
+    // and answered a write with a retryable 503 instead of a plain ownership refusal.
+    getNameRecord.mockRejectedValue(new Error("Object 0xc053d3 not found"));
+
+    expect((await resolveNameOwner("happy.sui")).status).toBe("not-found");
+  });
+
+  it("keeps a timeout retryable rather than calling the name unregistered", async () => {
+    getNameRecord.mockRejectedValue(new Error("deadline exceeded"));
+
+    expect((await resolveNameOwner("happy.sui")).status).toBe("rpc-unavailable");
+  });
+
+  it("reports a name with no record as not-found", async () => {
+    getNameRecord.mockResolvedValue(null);
+
+    expect((await resolveNameOwner("happy.sui")).status).toBe("not-found");
+  });
+
+  it("rejects a malformed name without touching the network", async () => {
+    expect((await resolveNameOwner("not a name")).status).toBe("invalid-name");
+    expect(getNameRecord).not.toHaveBeenCalled();
   });
 });
