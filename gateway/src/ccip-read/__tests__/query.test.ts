@@ -193,4 +193,45 @@ describe('getRecord text/contenthash', () => {
 
     expect(result.startsWith('0xe301')).toBe(true)
   })
+
+  // Regression: a name that exists only in Namespace (no SuiNS registration) must
+  // still serve its Namespace text records, contenthash, and avatar. The addr path
+  // already handled this; text/contenthash must not short-circuit on null SuiNS.
+  it('serves a Namespace text key when the SuiNS name does not exist', async () => {
+    resolveSuins.mockResolvedValue(null)
+    resolveNamespace.mockResolvedValue(namespaceRecord({ texts: { 'com.twitter': 'happysingh' } }))
+
+    const result = await getRecord(NAME, { functionName: 'text', args: [NODE, 'com.twitter'] })
+
+    expect(result).toBe('happysingh')
+  })
+
+  it('serves a Namespace avatar when the SuiNS name does not exist', async () => {
+    resolveSuins.mockResolvedValue(null)
+    resolveNamespace.mockResolvedValue(namespaceRecord({ texts: { avatar: 'https://example.com/a.png' } }))
+
+    const result = await getRecord(NAME, { functionName: 'text', args: [NODE, 'avatar'] })
+
+    expect(result).toBe('https://example.com/a.png')
+  })
+
+  it('serves a Namespace contenthash when the SuiNS name does not exist', async () => {
+    resolveSuins.mockResolvedValue(null)
+    resolveNamespace.mockResolvedValue(
+      namespaceRecord({ contenthash: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi' })
+    )
+
+    const result = await getRecord(NAME, { functionName: 'contenthash', args: [NODE] })
+
+    expect(result.startsWith('0xe301')).toBe(true)
+  })
+
+  it('derives org.suins.name from the requested ENS name even without a SuiNS registration', async () => {
+    resolveSuins.mockResolvedValue(null)
+    resolveNamespace.mockResolvedValue(null)
+
+    const result = await getRecord(NAME, { functionName: 'text', args: [NODE, 'org.suins.name'] })
+
+    expect(result).toBe('happysingh.sui')
+  })
 })

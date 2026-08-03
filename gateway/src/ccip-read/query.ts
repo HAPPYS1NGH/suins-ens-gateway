@@ -111,12 +111,11 @@ export async function getRecord(
     return encodeEnsipNineAddress(value, coinType)
   }
 
-  if (!nameData) {
-    // Name doesn't exist in SUINS — return empty/zero defaults for the remaining
-    // SUINS-sourced query types.
-    return functionName === 'text' ? '' : '0x'
-  }
-
+  // No early return when nameData is null: `addr` was already handled above, and
+  // the remaining query types fall back to Namespace via `selectRecordValue`, which
+  // tolerates a null SuiNS record through optional chaining. The only SuiNS-only
+  // keys (contentHash/walrus/walrusSiteId) correctly return '' when SuiNS is absent,
+  // and `org.suins.name` is derived from the requested name, not from SuiNS data.
   switch (functionName) {
     case 'text': {
       const key = args[1]
