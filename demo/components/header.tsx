@@ -26,6 +26,9 @@ export function Header({ session }: HeaderProps) {
         <a className="logo" href="/">
           on<span className="logo-accent">sui</span>.eth
         </a>
+        <nav className="app-header__nav">
+          <a href="/how-it-works">How it works</a>
+        </nav>
         <WalletMenu session={session} />
       </div>
     </header>
