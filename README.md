@@ -8,6 +8,12 @@ Query `happysingh.onsui.eth` and get back `happysingh.sui` data from SUINS: addr
 
 **Live on Ethereum Mainnet** | [SUINSResolver on Etherscan](https://etherscan.io/address/0x7974AF8BD3AEe4fe9f8833361fBc3249E3b23aB3#code) | [Gateway](https://suins-ens-gateway.happys1ngh.workers.dev/health)
 
+## How a name resolves
+
+![Resolving happysingh.onsui.eth to happysingh.sui through CCIP-Read](assets/resolve-flow.gif)
+
+Six steps, one loop: the wallet queries the resolver, the resolver hands back a gateway URL, the gateway reads SuiNS and Namespace in parallel, merges them, signs the result, and the resolver verifies that signature before the wallet sees an address. Watch it at `/how-it-works` in the demo app — hover to pause, click a dot to jump to a step — or read [ARCHITECTURE.md](ARCHITECTURE.md) for the same flow in prose.
+
 ## Try it
 
 Any `.sui` name works through `onsui.eth`:

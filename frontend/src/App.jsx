@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AddressRecords } from "./components/address-records.jsx";
+import { FlowExplainer } from "./components/flow-explainer.jsx";
 import { ProfileCard } from "./components/profile-card.jsx";
 import { SuinsRecords } from "./components/suins-records.jsx";
 import { resolveProfile } from "./resolve.js";
@@ -10,7 +11,24 @@ import { resolveProfile } from "./resolve.js";
  * the ENS CCIP-Read gateway (SuiNS + Namespace, no wallet, no writes). The profile
  * components are the demo's, fed straight from the resolved records.
  */
+/**
+ * Hash routing, not a router: this app is served as static files from IPFS,
+ * where a path like /how-it-works has nothing to resolve against.
+ */
+function useHashView() {
+  const [hash, setHash] = useState(() =>
+    typeof window === "undefined" ? "" : window.location.hash,
+  );
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  return hash === "#how-it-works" ? "how-it-works" : "profile";
+}
+
 export function App() {
+  const view = useHashView();
   const [input, setInput] = useState("happysingh");
   const [data, setData] = useState(null); // { name, suins, profile } | null
   const [status, setStatus] = useState("idle"); // idle | loading | error | notfound
@@ -63,12 +81,31 @@ export function App() {
       <div className="app">
         <header className="app-header">
           <div className="app-header__inner">
-            <a className="logo" href="/">
+            <a className="logo" href="#">
               on<span className="logo-accent">sui</span>.eth
             </a>
+            <nav className="app-header__nav">
+              <a href="#" aria-current={view === "profile" ? "page" : undefined}>
+                Profile
+              </a>
+              <a
+                href="#how-it-works"
+                aria-current={view === "how-it-works" ? "page" : undefined}
+              >
+                How it works
+              </a>
+            </nav>
           </div>
         </header>
 
+        {view === "how-it-works" ? (
+          <main className="main">
+            <section className="flow-page">
+              <h1 className="panel-title">One Sui name, read from Ethereum</h1>
+              <FlowExplainer />
+            </section>
+          </main>
+        ) : (
         <main className="main">
           <form className="lookup" onSubmit={onSubmit} role="search">
             <div className="lookup__field">
@@ -124,6 +161,7 @@ export function App() {
             </>
           ) : null}
         </main>
+        )}
 
         <footer className="footer">
           <span className="mono muted">SuiNS → ENS gateway demo · read-only</span>

@@ -10,6 +10,10 @@ ENS expects data on Ethereum. We can't put every SuiNS name on-chain—that's ex
 
 ## The solution: CCIP-Read (EIP-3668)
 
+![One resolution, step by step](assets/resolve-flow.gif)
+
+The animation above runs at `/how-it-works` in the demo app: six numbered hops, each labelled with the payload it carries — the name, the gateway URL, the SuiNS and Namespace reads, the merged records, the signed response. Hover to pause, click a dot to jump to a step. The sequence diagram below is the same flow, statically.
+
 EIP-3668 lets smart contracts fetch data from offchain APIs. The flow:
 
 ```mermaid
