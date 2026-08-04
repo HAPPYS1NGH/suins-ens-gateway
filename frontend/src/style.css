@@ -175,6 +175,32 @@ h3,
   color: var(--primary);
 }
 
+.app-header__nav {
+  margin-right: auto;
+  display: flex;
+  gap: 20px;
+  font-size: 0.9375rem;
+}
+
+.app-header__nav a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.app-header__nav a:hover,
+.app-header__nav a[aria-current="page"] {
+  color: var(--text-emphasized);
+}
+
+/* The explainer page: one full-width column inside the centered .main flex. */
+.flow-page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 /* ---------- Main layout ---------- */
 .main {
   flex: 1;
