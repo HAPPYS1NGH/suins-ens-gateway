@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 
+import { FlowExplainer } from "./flow-explainer";
 import { PixelAvatar } from "./pixel-avatar";
 import { useSignIn } from "./use-sign-in";
 import { useWalletCtaLabel } from "./use-wallet-cta";
@@ -168,6 +169,11 @@ export function Hero() {
             ))}
           </ul>
         </aside>
+      </div>
+
+      <div className="claim__flow">
+        <span className="claim__label">How a name resolves</span>
+        <FlowExplainer />
       </div>
     </section>
   );
