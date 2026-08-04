@@ -156,6 +156,32 @@
   fill: var(--fx-accent);
 }
 
+/* Payload chips — one per active edge, remounted with the beat. */
+
+.chip {
+  animation: fx-chip 320ms var(--ease-out) both;
+}
+
+.chip rect {
+  fill: color-mix(in srgb, var(--fx-accent) 12%, var(--fx-ink));
+  stroke: color-mix(in srgb, var(--fx-accent) 34%, transparent);
+  stroke-width: 1;
+}
+
+.chip text {
+  fill: color-mix(in srgb, var(--fx-accent) 78%, #ffffff);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  text-anchor: middle;
+}
+
+@keyframes fx-chip {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
 /* Travelling packet — remounted each beat, so it always starts clean. */
 
 .packet {
@@ -260,6 +286,7 @@
     display: none;
   }
 
+  .chip,
   .node,
   .caption {
     transition: none;

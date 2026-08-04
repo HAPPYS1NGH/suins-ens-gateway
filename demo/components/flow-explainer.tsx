@@ -44,19 +44,82 @@ interface Edge {
   num: string;
   nx: number;
   ny: number;
+  /** Payload carried on this edge, shown while its beat plays. */
+  chip?: { text: string; x: number; y: number };
 }
 
 const EDGES: Edge[] = [
-  { id: "query", beat: 0, num: "1", nx: 193, ny: 138, d: "M140,146 L246,146" },
-  { id: "ccip", beat: 1, num: "2", nx: 463, ny: 138, d: "M410,146 L516,146" },
-  { id: "sui", beat: 2, num: "3a", nx: 676, ny: 82, d: "M650,142 C678,132 690,51 716,51" },
-  { id: "db", beat: 2, num: "3b", nx: 680, ny: 196, d: "M650,170 C678,178 690,177 716,177" },
+  {
+    id: "query",
+    beat: 0,
+    num: "1",
+    nx: 193,
+    ny: 138,
+    d: "M140,146 L246,146",
+    chip: { text: "happysingh.onsui.eth", x: 193, y: 96 },
+  },
+  {
+    id: "ccip",
+    beat: 1,
+    num: "2",
+    nx: 463,
+    ny: 138,
+    d: "M410,146 L516,146",
+    chip: { text: "GET /lookup/0x7974…/0x9061….json", x: 463, y: 96 },
+  },
+  {
+    id: "sui",
+    beat: 2,
+    num: "3a",
+    nx: 676,
+    ny: 82,
+    d: "M650,142 C678,132 690,51 716,51",
+    chip: { text: 'suins.resolve("happysingh.sui")', x: 560, y: 106 },
+  },
+  {
+    id: "db",
+    beat: 2,
+    num: "3b",
+    nx: 680,
+    ny: 196,
+    d: "M650,170 C678,178 690,177 716,177",
+    chip: { text: 'namespace.getRecords("happysingh")', x: 700, y: 232 },
+  },
   { id: "aggUp", beat: 3, num: "", nx: 0, ny: 0, d: "M870,51 C896,51 906,90 906,118" },
   { id: "aggDown", beat: 3, num: "", nx: 0, ny: 0, d: "M870,177 C896,177 906,160 906,148" },
-  { id: "unified", beat: 3, delay: 700, num: "4", nx: 770, ny: 268, d: "M966,162 C966,272 760,292 585,186" },
-  { id: "signed", beat: 4, num: "5", nx: 464, ny: 184, d: "M516,168 L412,168" },
-  { id: "records", beat: 5, num: "6", nx: 194, ny: 184, d: "M246,168 L142,168" },
+  {
+    id: "unified",
+    beat: 3,
+    delay: 700,
+    num: "4",
+    nx: 770,
+    ny: 268,
+    d: "M966,162 C966,272 760,292 585,186",
+    chip: { text: "sui 0x556a…97c3 · eth 0x1a9C…4b2f", x: 700, y: 238 },
+  },
+  {
+    id: "signed",
+    beat: 4,
+    num: "5",
+    nx: 464,
+    ny: 184,
+    d: "M516,168 L412,168",
+    chip: { text: "200 OK · sig 0x1c8f…9d02", x: 464, y: 218 },
+  },
+  {
+    id: "records",
+    beat: 5,
+    num: "6",
+    nx: 194,
+    ny: 184,
+    d: "M246,168 L142,168",
+    chip: { text: "addr(784) 0x556a…97c3", x: 194, y: 218 },
+  },
 ];
+
+/** Monospace chip width, estimated from character count. */
+const CHIP_H = 19;
+const chipW = (text: string) => text.length * 5.75 + 16;
 
 const BEATS: { active: string[]; caption: string }[] = [
   {
@@ -175,6 +238,25 @@ export function FlowExplainer() {
               {e.num}
             </text>
           ))}
+
+          {EDGES.filter((e) => e.beat === beat && e.chip).map((e) => {
+            const chip = e.chip!;
+            const w = chipW(chip.text);
+            return (
+              <g className={styles.chip} key={`${beat}-c-${e.id}`}>
+                <rect
+                  height={CHIP_H}
+                  rx="6"
+                  width={w}
+                  x={chip.x - w / 2}
+                  y={chip.y - CHIP_H / 2}
+                />
+                <text x={chip.x} y={chip.y + 3.5}>
+                  {chip.text}
+                </text>
+              </g>
+            );
+          })}
 
           {EDGES.filter((e) => e.beat === beat).map((e) => (
             <circle
