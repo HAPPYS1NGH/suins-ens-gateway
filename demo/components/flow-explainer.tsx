@@ -56,7 +56,7 @@ const EDGES: Edge[] = [
     nx: 193,
     ny: 138,
     d: "M140,146 L246,146",
-    chip: { text: "happysingh.onsui.eth", x: 193, y: 96 },
+    chip: { text: "happysingh.onsui.eth", x: 193, y: 78 },
   },
   {
     id: "ccip",

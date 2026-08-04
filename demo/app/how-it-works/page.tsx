@@ -8,19 +8,14 @@ export const metadata: Metadata = {
     "A Sui name, readable from Ethereum: wallet to ENS resolver to gateway to SuiNS.",
 };
 
+/** The root layout already supplies <main>, so this page is just its content. */
 export default function HowItWorksPage() {
   return (
-    <main
-      style={{
-        maxWidth: 640,
-        margin: "0 auto",
-        padding: "var(--s-6) var(--s-3)",
-        display: "grid",
-        gap: "var(--s-3)",
-      }}
-    >
-      <h1 style={{ margin: 0, fontSize: 28 }}>One Sui name, read from Ethereum</h1>
+    <section style={{ width: "100%", display: "grid", gap: "var(--s-3)" }}>
+      <h1 style={{ margin: 0, fontSize: 28 }}>
+        One Sui name, read from Ethereum
+      </h1>
       <FlowExplainer />
-    </main>
+    </section>
   );
 }
